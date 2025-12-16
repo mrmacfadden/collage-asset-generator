@@ -3,8 +3,13 @@
 // Track selected tags for filtering
 let selectedTags = [];
 
-// Track selected blend mode
-let selectedBlendMode = 'normal';
+// Track selected SVG effects
+let selectedEffects = [];
+
+// Track effect intensities
+let effectIntensity = {
+    blur: 3
+};
 
 // Track custom image URL
 let customImageUrl = '';
@@ -21,7 +26,6 @@ let textFontUnderline = false;
 // Track overlay settings
 let selectedOverlay = '';
 let overlayOpacity = 100;
-let overlayBlendMode = 'multiply';
 
 // Track paint overlay settings
 let paintColor = '#FFFF00';
@@ -197,6 +201,7 @@ function setToolbarButtonsEnabled(enabled) {
     paintBtn.disabled = !enabled;
     textBtn.disabled = !enabled;
     printBtn.disabled = !enabled;
+    saveBtn.disabled = !enabled;
 }
 
 function getRandomImages(count) {
@@ -261,15 +266,25 @@ function renderCollage() {
         item.innerHTML = `
             <img src="${imageData.path}" alt="Collage image ${index + 1}" loading="lazy">
         `;
-        // Apply blend mode to the image
-        if (selectedBlendMode !== 'normal') {
-            const img = item.querySelector('img');
-            img.style.mixBlendMode = selectedBlendMode;
-        }
-        // Apply grayscale filter if paint overlay is enabled (for color blend mode effect)
+        // Apply SVG filters to the image
+        const img = item.querySelector('img');
+        let filterParts = [];
+        
+        selectedEffects.forEach(effect => {
+            if (effect === 'blur') {
+                const blurAmount = effectIntensity.blur;
+                filterParts.push(`blur(${blurAmount}px)`);
+            } else {
+                filterParts.push(`url(#svg-${effect})`);
+            }
+        });
+        
         if (paintEnabled && paintOpacity > 0) {
-            const img = item.querySelector('img');
-            img.style.filter = 'grayscale(100%)';
+            filterParts.push('grayscale(100%)');
+        }
+        
+        if (filterParts.length > 0) {
+            img.style.filter = filterParts.join(' ');
         }
         container.appendChild(item);
     });
@@ -299,7 +314,6 @@ function applyOverlay() {
         overlayElement.style.backgroundSize = 'cover';
         overlayElement.style.opacity = (overlayOpacity / 100);
         overlayElement.style.pointerEvents = 'none';
-        overlayElement.style.mixBlendMode = overlayBlendMode;
     } else {
         if (overlayElement) {
             overlayElement.remove();
@@ -427,16 +441,29 @@ function rgbToSaturation(r, g, b) {
     return Math.round(s * 100);
 }
 
-function applyBlendModes() {
+function applySVGEffects() {
     const container = document.getElementById('collage-container');
     const images = container.querySelectorAll('img');
     
     images.forEach(img => {
-        if (selectedBlendMode !== 'normal') {
-            img.style.mixBlendMode = selectedBlendMode;
-        } else {
-            img.style.mixBlendMode = 'normal';
+        let filterParts = [];
+        
+        // Add SVG filters (these handle complex effects reliably in print)
+        selectedEffects.forEach(effect => {
+            if (effect === 'blur') {
+                const blurAmount = (effectIntensity.blur);
+                filterParts.push(`blur(${blurAmount}px)`);
+            } else {
+                // All other effects use SVG filters
+                filterParts.push(`url(#svg-${effect})`);
+            }
+        });
+        
+        if (paintEnabled && paintOpacity > 0) {
+            filterParts.push('grayscale(100%)');
         }
+        
+        img.style.filter = filterParts.join(' ') || 'none';
     });
 }
 
@@ -479,55 +506,229 @@ function initializeTagFilters() {
     });
 }
 
-function initializeBlendModes() {
-    const blendModes = [
-        { name: 'Normal', value: 'normal' },
-        { name: 'Multiply', value: 'multiply' },
-        { name: 'Screen', value: 'screen' },
-        { name: 'Overlay', value: 'overlay' },
-        { name: 'Darken', value: 'darken' },
-        { name: 'Lighten', value: 'lighten' },
-        { name: 'Color Dodge', value: 'color-dodge' },
-        { name: 'Color Burn', value: 'color-burn' },
-        { name: 'Hard Light', value: 'hard-light' },
-        { name: 'Soft Light', value: 'soft-light' },
-        { name: 'Difference', value: 'difference' },
-        { name: 'Exclusion', value: 'exclusion' },
-        { name: 'Hue', value: 'hue' },
-        { name: 'Saturation', value: 'saturation' },
-        { name: 'Color', value: 'color' },
-        { name: 'Luminosity', value: 'luminosity' }
+function initializeSVGEffects() {
+    const svgEffects = [
+        { name: 'Blur', value: 'blur', hasSlider: true, min: 0, max: 10, label: 'Amount' },
+        { name: 'Sharpen', value: 'sharpen', hasSlider: false },
+        { name: 'Sepia', value: 'sepia', hasSlider: false },
+        { name: 'High Contrast', value: 'highcontrast', hasSlider: false },
+        { name: 'Vintage', value: 'vintage', hasSlider: false },
+        { name: 'Posterize', value: 'posterize', hasSlider: false },
+        { name: 'Emboss', value: 'emboss', hasSlider: false },
+        { name: 'Glitch', value: 'glitch', hasSlider: false }
     ];
     
-    const blendContainer = document.getElementById('blend-modes');
+    const effectsContainer = document.getElementById('blend-modes');
+    if (!effectsContainer) {
+        console.error('Effects container not found!');
+        return;
+    }
     
-    blendModes.forEach(mode => {
+    effectsContainer.innerHTML = ''; // Clear existing content
+    
+    svgEffects.forEach(effect => {
+        const effectWrapper = document.createElement('div');
+        effectWrapper.style.marginBottom = '10px';
+        
         const label = document.createElement('label');
         label.className = 'blend-mode-label';
+        label.style.display = 'block';
+        label.style.cursor = 'pointer';
+        label.style.marginBottom = '3px';
         
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.className = 'blend-mode-radio';
-        radio.name = 'blend-mode';
-        radio.value = mode.value;
-        if (mode.value === selectedBlendMode) {
-            radio.checked = true;
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'blend-mode-radio';
+        checkbox.name = 'svg-effect';
+        checkbox.value = effect.value;
+        checkbox.style.marginRight = '5px';
+        
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(effect.name));
+        effectWrapper.appendChild(label);
+        
+        // Create slider container if needed
+        let sliderContainer = null;
+        if (effect.hasSlider) {
+            sliderContainer = document.createElement('div');
+            sliderContainer.style.display = 'none';
+            sliderContainer.style.marginLeft = '20px';
+            sliderContainer.style.marginTop = '5px';
+            sliderContainer.style.fontSize = '12px';
+            sliderContainer.style.display = 'flex';
+            sliderContainer.style.alignItems = 'center';
+            sliderContainer.style.gap = '8px';
+            
+            const sliderLabel = document.createElement('label');
+            sliderLabel.textContent = effect.label;
+            sliderLabel.style.minWidth = '50px';
+            sliderLabel.style.whiteSpace = 'nowrap';
+            
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = effect.min;
+            slider.max = effect.max;
+            slider.value = effectIntensity.blur;
+            slider.style.flex = '1';
+            slider.style.cursor = 'pointer';
+            
+            const valueDisplay = document.createElement('span');
+            valueDisplay.textContent = slider.value + 'px';
+            valueDisplay.style.minWidth = '35px';
+            valueDisplay.style.textAlign = 'right';
+            
+            slider.addEventListener('input', function() {
+                effectIntensity.blur = parseInt(this.value);
+                valueDisplay.textContent = this.value + 'px';
+                applySVGEffects();
+            });
+            
+            sliderContainer.appendChild(sliderLabel);
+            sliderContainer.appendChild(slider);
+            sliderContainer.appendChild(valueDisplay);
+            effectWrapper.appendChild(sliderContainer);
         }
         
-        radio.addEventListener('change', function() {
-            selectedBlendMode = this.value;
-            applyBlendModes();
+        // Attach checkbox event listener
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                if (!selectedEffects.includes(this.value)) {
+                    selectedEffects.push(this.value);
+                }
+            } else {
+                selectedEffects = selectedEffects.filter(e => e !== this.value);
+            }
+            if (sliderContainer) {
+                sliderContainer.style.display = this.checked ? 'flex' : 'none';
+            }
+            applySVGEffects();
         });
         
-        label.appendChild(radio);
-        label.appendChild(document.createTextNode(mode.name));
-        blendContainer.appendChild(label);
+        effectsContainer.appendChild(effectWrapper);
     });
 }
 
 // Event listeners
 document.getElementById('printBtn').addEventListener('click', printCollage);
 const printBtn = document.getElementById('printBtn');
+
+function saveAsJPG() {
+    const collageContainer = document.querySelector('.collage-container.active');
+    
+    if (!collageContainer) {
+        alert('No collage to save');
+        return;
+    }
+    
+    // Letter page dimensions: 8.5" x 11" at 96 DPI = 816x1056 pixels
+    const canvasWidth = 816;
+    const canvasHeight = 1056;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext('2d');
+    
+    // Fill with white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    
+    // Get all images and their computed styles
+    const images = collageContainer.querySelectorAll('.collage-item img');
+    let imagesLoaded = 0;
+    let totalImages = images.length;
+    
+    if (totalImages === 0) {
+        alert('No images in collage');
+        return;
+    }
+    
+    function drawAllImages() {
+        // Render each image onto the canvas
+        images.forEach((imgElement) => {
+            try {
+                const item = imgElement.parentElement;
+                const rect = item.getBoundingClientRect();
+                const containerRect = collageContainer.getBoundingClientRect();
+                
+                // Calculate position relative to container in canvas coordinates
+                const x = (rect.left - containerRect.left) / containerRect.width * canvasWidth;
+                const y = (rect.top - containerRect.top) / containerRect.height * canvasHeight;
+                const width = rect.width / containerRect.width * canvasWidth;
+                const height = rect.height / containerRect.height * canvasHeight;
+                
+                if (imgElement.complete && imgElement.naturalWidth > 0) {
+                    // Implement object-fit: cover manually
+                    const imgAspect = imgElement.naturalWidth / imgElement.naturalHeight;
+                    const containerAspect = width / height;
+                    
+                    let sourceX = 0;
+                    let sourceY = 0;
+                    let sourceWidth = imgElement.naturalWidth;
+                    let sourceHeight = imgElement.naturalHeight;
+                    
+                    if (imgAspect > containerAspect) {
+                        // Image is wider - crop left/right
+                        sourceWidth = imgElement.naturalHeight * containerAspect;
+                        sourceX = (imgElement.naturalWidth - sourceWidth) / 2;
+                    } else {
+                        // Image is taller - crop top/bottom
+                        sourceHeight = imgElement.naturalWidth / containerAspect;
+                        sourceY = (imgElement.naturalHeight - sourceHeight) / 2;
+                    }
+                    
+                    // Draw the cropped image
+                    ctx.drawImage(
+                        imgElement,
+                        sourceX,
+                        sourceY,
+                        sourceWidth,
+                        sourceHeight,
+                        x,
+                        y,
+                        width,
+                        height
+                    );
+                }
+            } catch (e) {
+                console.warn('Error drawing image:', e);
+            }
+        });
+        
+        // Convert to JPG and download
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/jpeg', 0.98);
+        link.download = 'collage_' + new Date().getTime() + '.jpg';
+        link.click();
+    }
+    
+    // Ensure all images are loaded
+    images.forEach((img) => {
+        if (img.complete && img.naturalWidth > 0) {
+            imagesLoaded++;
+        } else {
+            img.onload = () => {
+                imagesLoaded++;
+                if (imagesLoaded === totalImages) {
+                    drawAllImages();
+                }
+            };
+            img.onerror = () => {
+                imagesLoaded++;
+                if (imagesLoaded === totalImages) {
+                    drawAllImages();
+                }
+            };
+        }
+    });
+    
+    if (imagesLoaded === totalImages) {
+        drawAllImages();
+    }
+}
+
+document.getElementById('saveBtn').addEventListener('click', saveAsJPG);
+const saveBtn = document.getElementById('saveBtn');
 
 const tryAgainBtn = document.getElementById('tryAgainBtn');
 tryAgainBtn.addEventListener('click', function() {
@@ -577,7 +778,7 @@ const overlayPanel = document.getElementById('overlay-panel');
 const overlayList = document.getElementById('overlay-list');
 const overlayOpacitySlider = document.getElementById('overlayOpacity');
 const opacityValue = document.getElementById('opacityValue');
-const overlayBlendList = document.getElementById('overlay-blend-list');
+
 
 const paintBtn = document.getElementById('paintBtn');
 const paintPanel = document.getElementById('paint-panel');
@@ -774,7 +975,7 @@ document.addEventListener('click', function(e) {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeTagFilters();
-    initializeBlendModes();
+    initializeSVGEffects();
     initializeOverlays();
     
     // Set up the generate button
@@ -824,49 +1025,7 @@ function initializeOverlays() {
         
         overlayList.appendChild(label);
     });
-    
-    // Initialize blend modes for overlay
-    const blendModes = [
-        { name: 'Normal', value: 'normal' },
-        { name: 'Multiply', value: 'multiply' },
-        { name: 'Screen', value: 'screen' },
-        { name: 'Overlay', value: 'overlay' },
-        { name: 'Darken', value: 'darken' },
-        { name: 'Lighten', value: 'lighten' },
-        { name: 'Color Dodge', value: 'color-dodge' },
-        { name: 'Color Burn', value: 'color-burn' },
-        { name: 'Hard Light', value: 'hard-light' },
-        { name: 'Soft Light', value: 'soft-light' },
-        { name: 'Difference', value: 'difference' },
-        { name: 'Exclusion', value: 'exclusion' },
-        { name: 'Hue', value: 'hue' },
-        { name: 'Saturation', value: 'saturation' },
-        { name: 'Color', value: 'color' },
-        { name: 'Luminosity', value: 'luminosity' }
-    ];
-    
-    overlayBlendList.innerHTML = '';
-    blendModes.forEach(mode => {
-        const label = document.createElement('label');
-        label.className = 'overlay-blend-label';
-        
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'overlay-blend';
-        radio.value = mode.value;
-        if (mode.value === overlayBlendMode) {
-            radio.checked = true;
-        }
-        
-        radio.addEventListener('change', function() {
-            overlayBlendMode = this.value;
-            applyOverlay();
-        });
-        
-        label.appendChild(radio);
-        label.appendChild(document.createTextNode(mode.name));
-        overlayBlendList.appendChild(label);
-    });
+
 }
 
 function updateTextOverlay() {

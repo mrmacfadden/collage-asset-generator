@@ -24,11 +24,11 @@
                 <div id="tag-filters" class="dropdown-menu dropdown-menu-dark filter-dropdown">
                     <!-- Tag filter buttons will be generated here -->
                 </div>
-                <button id="effectsBtn" class="toolbar-btn" title="Blend Modes">
+                <button id="effectsBtn" class="toolbar-btn" title="SVG Effects">
                     <i class="bi bi-stars"></i>
                 </button>
                 <div id="blend-modes" class="dropdown-menu dropdown-menu-dark filter-dropdown effects-dropdown">
-                    <!-- Blend mode buttons will be generated here -->
+                    <!-- SVG effect buttons will be generated here -->
                 </div>
                 <button id="imageBtn" class="toolbar-btn" title="Add Image URL">
                     <i class="bi bi-image"></i>
@@ -56,12 +56,6 @@
                             <h5>Overlay Opacity</h5>
                             <input type="range" id="overlayOpacity" class="form-range" min="0" max="100" value="100">
                             <span id="opacityValue">100%</span>
-                        </div>
-                        <div class="overlay-blend-modes">
-                            <h5>Blend Mode</h5>
-                            <div id="overlay-blend-list">
-                                <!-- Blend modes will be populated by JavaScript -->
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -152,6 +146,9 @@
                 <button id="printBtn" class="toolbar-btn" title="Print/Download as PDF">
                     <i class="bi bi-printer"></i>
                 </button>
+                <button id="saveBtn" class="toolbar-btn" title="Save as JPG">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </aside>
 
@@ -178,6 +175,77 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- SVG Filter Definitions -->
+    <svg style="display:none;">
+        <defs>
+            <!-- Blur effect -->
+            <filter id="svg-blur">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
+            </filter>
+            
+            <!-- Sharpen effect -->
+            <filter id="svg-sharpen">
+                <feConvolveMatrix in="SourceGraphic"
+                    kernelMatrix="0 -2 0 -2 11 -2 0 -2 0"
+                    divisor="3" />
+            </filter>
+            
+            <!-- Sepia tone effect -->
+            <filter id="svg-sepia">
+                <feColorMatrix type="saturate" values="0.5" />
+                <feColorMatrix type="matrix" values=".393 .769 .189 0 0
+                                                      .349 .686 .168 0 0
+                                                      .272 .534 .131 0 0
+                                                      0 0 0 1 0" />
+            </filter>
+            
+            <!-- High contrast effect -->
+            <filter id="svg-highcontrast">
+                <feComponentTransfer>
+                    <feFuncR type="discrete" tableValues="0 1"/>
+                    <feFuncG type="discrete" tableValues="0 1"/>
+                    <feFuncB type="discrete" tableValues="0 1"/>
+                </feComponentTransfer>
+                <feColorMatrix type="saturate" values="2" />
+            </filter>
+            
+            <!-- Vintage effect -->
+            <filter id="svg-vintage">
+                <feColorMatrix type="saturate" values="0.6" />
+                <feComponentTransfer>
+                    <feFuncR type="linear" slope="0.8" intercept="0.1"/>
+                    <feFuncG type="linear" slope="0.8" intercept="0.08"/>
+                    <feFuncB type="linear" slope="0.6" intercept="0.05"/>
+                </feComponentTransfer>
+            </filter>
+            
+            <!-- Posterize effect -->
+            <filter id="svg-posterize">
+                <feComponentTransfer>
+                    <feFuncR type="discrete" tableValues="0 0.25 0.5 0.75 1"/>
+                    <feFuncG type="discrete" tableValues="0 0.25 0.5 0.75 1"/>
+                    <feFuncB type="discrete" tableValues="0 0.25 0.5 0.75 1"/>
+                </feComponentTransfer>
+            </filter>
+            
+            <!-- Emboss effect -->
+            <filter id="svg-emboss">
+                <feConvolveMatrix in="SourceGraphic"
+                    kernelMatrix="-2 -1 0 -1 1 1 0 1 2"
+                    divisor="1"
+                    bias="0.5" />
+            </filter>
+            
+            <!-- Glitch/Displacement effect -->
+            <filter id="svg-glitch">
+                <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="noise" seed="2"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+    
     <script src="images.js"></script>
     <script src="app.js"></script>
 </body>

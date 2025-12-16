@@ -1,10 +1,10 @@
-// Overlay textures with blend mode settings
+// Overlay textures
 const overlays = [
-    { name: 'None', path: '', blendMode: 'normal' },
-    { name: 'CRT Overlay', path: 'img/overlay/crt-overlay.jpg', blendMode: 'multiply' },
-    { name: 'Dry Cracks', path: 'img/overlay/dry-cracks.jpg', blendMode: 'multiply' },
-    { name: 'Grit', path: 'img/overlay/grit.jpg', blendMode: 'multiply' },
-    { name: 'Yellow', path: 'img/overlay/yellow.png', blendMode: 'multiply' }
+    { name: 'None', path: '' },
+    { name: 'CRT Overlay', path: 'img/overlay/crt-overlay.png' },
+    { name: 'Dry Cracks', path: 'img/overlay/dry-cracks.png' },
+    { name: 'Grit', path: 'img/overlay/grit.png' },
+    { name: 'Yellow', path: 'img/overlay/yellow.png' }
     // Add more overlays here as you add files to img/overlay/
-    // Format: { name: 'Texture Name', path: 'img/overlay/texture.png', blendMode: 'multiply' }
+    // Format: { name: 'Texture Name', path: 'img/overlay/texture.png' }
 ];

@@ -97,13 +97,20 @@ header h1 {
     position: relative;
 }
 
-.toolbar-btn:hover {
+.toolbar-btn:hover:not(:disabled) {
     background-color: #6c757d;
     transform: scale(1.05);
 }
 
-.toolbar-btn:active {
-    background-color: #0d6efd;
+.toolbar-btn:active:not(:disabled) {
+    background-color: #a855f7;
+}
+
+.toolbar-btn:disabled {
+    background-color: #343a40;
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 .filter-dropdown {
@@ -143,7 +150,7 @@ header h1 {
 }
 
 .tag-filter.active {
-    background-color: #0d6efd;
+    background-color: #a855f7;
     color: white;
 }
 
@@ -183,7 +190,7 @@ header h1 {
     height: 18px;
     margin-right: 0.75rem;
     cursor: pointer;
-    accent-color: #0d6efd;
+    accent-color: #a855f7;
 }
 
 /* Image URL Modal */
@@ -236,7 +243,7 @@ header h1 {
 
 .image-modal-content .form-control:focus {
     background-color: #2d2d2d;
-    border-color: #0d6efd;
+    border-color: #a855f7;
     color: white;
     box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
@@ -304,7 +311,7 @@ header h1 {
 
 .text-modal-content .form-control:focus {
     background-color: #2d2d2d;
-    border-color: #0d6efd;
+    border-color: #a855f7;
     color: white;
     box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
@@ -356,7 +363,7 @@ header h1 {
 
 .control-group .form-control-sm:focus {
     background-color: #2d2d2d;
-    border-color: #0d6efd;
+    border-color: #a855f7;
     color: white;
 }
 
@@ -458,7 +465,7 @@ header h1 {
 }
 
 .overlay-item:hover {
-    border-color: #0d6efd;
+    border-color: #a855f7;
     background-color: #353535;
 }
 
@@ -580,7 +587,7 @@ header h1 {
 }
 
 #paintOpacityValue {
-    color: #0d6efd;
+    color: #a855f7;
     font-weight: bold;
     font-size: 0.875rem;
 }
@@ -590,19 +597,19 @@ header h1 {
 }
 
 #opacityValue {
-    color: #0d6efd;
+    color: #a855f7;
     font-weight: bold;
     font-size: 0.875rem;
 }
 
 .style-buttons .btn:hover {
-    border-color: #0d6efd;
+    border-color: #a855f7;
     color: white;
 }
 
 .style-buttons .btn.active {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: #a855f7;
+    border-color: #a855f7;
     color: white;
 }
 
@@ -634,7 +641,7 @@ header h1 {
 .text-overlay:hover,
 .text-overlay:focus,
 .text-overlay:active {
-    border-color: #0d6efd;
+    border-color: #a855f7;
     box-shadow: 0 0 10px rgba(13, 110, 253, 0.5);
 }
 
@@ -669,8 +676,8 @@ header h1 {
 }
 
 .tag-filter.active {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: #a855f7;
+    border-color: #a855f7;
     color: white;
 }
 
@@ -891,9 +898,13 @@ header h1 {
         font-size: 1.25rem;
     }
 
-    /* Ensure filters are preserved during print */
     .collage-item img {
-        filter: grayscale(100%) !important;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        display: block;
+        filter: none !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
@@ -902,4 +913,21 @@ header h1 {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
+}
+
+/* Override Bootstrap primary button color */
+.btn-primary {
+    background-color: #a855f7 !important;
+    border-color: #a855f7 !important;
+}
+
+.btn-primary:hover {
+    background-color: #9333ea !important;
+    border-color: #9333ea !important;
+}
+
+.btn-primary:active,
+.btn-primary:focus {
+    background-color: #7e22ce !important;
+    border-color: #7e22ce !important;
 }
