@@ -890,4 +890,16 @@ header h1 {
     header h1 {
         font-size: 1.25rem;
     }
+
+    /* Ensure filters are preserved during print */
+    .collage-item img {
+        filter: grayscale(100%) !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    #paint-layer {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
 }

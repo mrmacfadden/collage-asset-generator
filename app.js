@@ -24,9 +24,12 @@ let overlayOpacity = 100;
 let overlayBlendMode = 'multiply';
 
 // Track paint overlay settings
-let paintColor = '#000000';
-let paintOpacity = 100;
+let paintColor = '#FFFF00';
+let paintOpacity = 50;
 let paintEnabled = false;
+
+// Track if collage has been generated
+let assetsGenerated = false;
 
 // Layout patterns with grid positions
 const layoutPatterns = [
@@ -186,6 +189,16 @@ const layoutPatterns = [
     }
 ];
 
+function setToolbarButtonsEnabled(enabled) {
+    filterBtn.disabled = !enabled;
+    effectsBtn.disabled = !enabled;
+    imageBtn.disabled = !enabled;
+    overlayBtn.disabled = !enabled;
+    paintBtn.disabled = !enabled;
+    textBtn.disabled = !enabled;
+    printBtn.disabled = !enabled;
+}
+
 function getRandomImages(count) {
     const shuffled = [...images].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
@@ -253,6 +266,11 @@ function renderCollage() {
             const img = item.querySelector('img');
             img.style.mixBlendMode = selectedBlendMode;
         }
+        // Apply grayscale filter if paint overlay is enabled (for color blend mode effect)
+        if (paintEnabled && paintOpacity > 0) {
+            const img = item.querySelector('img');
+            img.style.filter = 'grayscale(100%)';
+        }
         container.appendChild(item);
     });
     
@@ -295,26 +313,118 @@ function applyPaintOverlay() {
     
     if (paintEnabled && paintOpacity > 0) {
         if (!paintElement) {
-            paintElement = document.createElement('div');
-            paintElement.id = 'paint-layer';
-            paintElement.style.position = 'absolute';
-            paintElement.style.top = '0';
-            paintElement.style.left = '0';
-            paintElement.style.width = '100%';
-            paintElement.style.height = '100%';
-            paintElement.style.zIndex = '120';
-            paintElement.style.pointerEvents = 'none';
+            // Create SVG with proper filters for print compatibility
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.id = 'paint-layer';
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%');
+            svg.setAttribute('viewBox', '0 0 816 1056');
+            svg.style.position = 'absolute';
+            svg.style.top = '0';
+            svg.style.left = '0';
+            svg.style.width = '100%';
+            svg.style.height = '100%';
+            svg.style.zIndex = '120';
+            svg.style.pointerEvents = 'none';
+            
+            // Create defs with color blend filter
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            
+            // Color mode filter using feColorMatrix
+            const colorFilter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+            colorFilter.setAttribute('id', 'colorBlend');
+            colorFilter.setAttribute('x', '-50%');
+            colorFilter.setAttribute('y', '-50%');
+            colorFilter.setAttribute('width', '200%');
+            colorFilter.setAttribute('height', '200%');
+            
+            // Get RGB values from paint color
+            const rgb = hexToRgb(paintColor);
+            const hue = rgbToHue(rgb.r, rgb.g, rgb.b);
+            const saturation = rgbToSaturation(rgb.r, rgb.g, rgb.b);
+            
+            // Use feColorMatrix to shift hue while preserving luminosity
+            const colorMatrix = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+            colorMatrix.setAttribute('type', 'saturate');
+            colorMatrix.setAttribute('values', '0');
+            colorMatrix.setAttribute('result', 'desaturated');
+            colorFilter.appendChild(colorMatrix);
+            
+            // Apply hue rotation based on paint color
+            const hueRotate = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+            hueRotate.setAttribute('type', 'hueRotate');
+            hueRotate.setAttribute('values', hue);
+            hueRotate.setAttribute('in', 'desaturated');
+            colorFilter.appendChild(hueRotate);
+            
+            defs.appendChild(colorFilter);
+            svg.appendChild(defs);
+            
+            // Create rectangle for color overlay
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('width', '816');
+            rect.setAttribute('height', '1056');
+            rect.setAttribute('fill', paintColor);
+            rect.setAttribute('class', 'color-overlay-rect');
+            rect.style.mixBlendMode = 'color';
+            svg.appendChild(rect);
+            
+            paintElement = svg;
             letterPage.appendChild(paintElement);
         }
         
-        paintElement.style.backgroundColor = paintColor;
-        paintElement.style.opacity = (paintOpacity / 100);
-        paintElement.style.mixBlendMode = 'color';
+        // Update color and opacity
+        const rect = paintElement.querySelector('.color-overlay-rect');
+        if (rect) {
+            rect.setAttribute('fill', paintColor);
+            rect.style.opacity = (paintOpacity / 100).toString();
+        }
     } else {
         if (paintElement) {
             paintElement.remove();
         }
     }
+}
+
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 };
+}
+
+function rgbToHue(r, g, b) {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0;
+    if (max !== min) {
+        const d = max - min;
+        switch(max) {
+            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+            case g: h = ((b - r) / d + 2) / 6; break;
+            case b: h = ((r - g) / d + 4) / 6; break;
+        }
+    }
+    return Math.round(h * 360);
+}
+
+function rgbToSaturation(r, g, b) {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    let s = 0;
+    if (max !== min) {
+        s = l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+    }
+    return Math.round(s * 100);
 }
 
 function applyBlendModes() {
@@ -417,6 +527,7 @@ function initializeBlendModes() {
 
 // Event listeners
 document.getElementById('printBtn').addEventListener('click', printCollage);
+const printBtn = document.getElementById('printBtn');
 
 const tryAgainBtn = document.getElementById('tryAgainBtn');
 tryAgainBtn.addEventListener('click', function() {
@@ -427,6 +538,8 @@ tryAgainBtn.addEventListener('click', function() {
     if (!generateOverlay.classList.contains('hidden')) {
         generateOverlay.classList.add('hidden');
         collageContainer.classList.add('active');
+        assetsGenerated = true;
+        setToolbarButtonsEnabled(true);
     }
     
     shuffleLayout();
@@ -447,7 +560,6 @@ const textModal = document.getElementById('text-modal');
 const textInput = document.getElementById('textInput');
 const applyTextBtn = document.getElementById('applyTextBtn');
 const clearTextBtn = document.getElementById('clearTextBtn');
-const deleteTextBtn = document.getElementById('deleteTextBtn');
 const textOverlay = document.getElementById('text-overlay');
 const textContent = document.getElementById('text-content');
 
@@ -566,17 +678,9 @@ applyTextBtn.addEventListener('click', function(e) {
     textOverlayContent = textInput.value.trim();
     updateTextOverlay();
     initializeTextInteractions();
-    textModal.classList.remove('show');
 });
 
 clearTextBtn.addEventListener('click', function() {
-    textOverlayContent = '';
-    textInput.value = '';
-    textModal.classList.remove('show');
-    updateTextOverlay();
-});
-
-deleteTextBtn.addEventListener('click', function() {
     textOverlayContent = '';
     textInput.value = '';
     textModal.classList.remove('show');
@@ -641,6 +745,7 @@ paintOpacitySlider.addEventListener('input', function() {
 
 paintToggle.addEventListener('change', function() {
     paintEnabled = this.checked;
+    renderCollage(); // Re-render to apply/remove grayscale
     applyPaintOverlay();
 });
 
@@ -681,7 +786,12 @@ document.addEventListener('DOMContentLoaded', function() {
         generateOverlay.classList.add('hidden');
         collageContainer.classList.add('active');
         renderCollage();
+        assetsGenerated = true;
+        setToolbarButtonsEnabled(true);
     });
+    
+    // Disable toolbar buttons on page load
+    setToolbarButtonsEnabled(false);
 });
 
 function initializeOverlays() {
