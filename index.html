@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collage Asset Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <script src="overlays.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Toolbar -->
+        <aside class="left-toolbar">
+            <div class="toolbar-buttons">
+                <button id="tryAgainBtn" class="toolbar-btn" title="Try Again">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+                <button id="filterBtn" class="toolbar-btn" title="Filter Tags">
+                    <i class="bi bi-funnel"></i>
+                </button>
+                <div id="tag-filters" class="dropdown-menu dropdown-menu-dark filter-dropdown">
+                    <!-- Tag filter buttons will be generated here -->
+                </div>
+                <button id="effectsBtn" class="toolbar-btn" title="Blend Modes">
+                    <i class="bi bi-stars"></i>
+                </button>
+                <div id="blend-modes" class="dropdown-menu dropdown-menu-dark filter-dropdown effects-dropdown">
+                    <!-- Blend mode buttons will be generated here -->
+                </div>
+                <button id="imageBtn" class="toolbar-btn" title="Add Image URL">
+                    <i class="bi bi-image"></i>
+                </button>
+                <div id="image-modal" class="image-modal">
+                    <div class="image-modal-content">
+                        <h4>Add Image URL</h4>
+                        <input type="text" id="imageUrlInput" class="form-control" placeholder="Enter image URL...">
+                        <div class="image-modal-buttons">
+                            <button id="applyImageBtn" class="btn btn-primary btn-sm">Apply</button>
+                            <button id="clearImageBtn" class="btn btn-secondary btn-sm">Clear</button>
+                        </div>
+                    </div>
+                </div>
+                <button id="overlayBtn" class="toolbar-btn" title="Overlay & Texture">
+                    <i class="bi bi-layers"></i>
+                </button>
+                <div id="overlay-panel" class="overlay-panel">
+                    <div class="overlay-panel-content">
+                        <h4>Overlay & Texture</h4>
+                        <div id="overlay-list" class="overlay-list">
+                            <!-- Overlays will be populated by JavaScript -->
+                        </div>
+                        <div class="overlay-controls">
+                            <h5>Overlay Opacity</h5>
+                            <input type="range" id="overlayOpacity" class="form-range" min="0" max="100" value="100">
+                            <span id="opacityValue">100%</span>
+                        </div>
+                        <div class="overlay-blend-modes">
+                            <h5>Blend Mode</h5>
+                            <div id="overlay-blend-list">
+                                <!-- Blend modes will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button id="paintBtn" class="toolbar-btn" title="Paint Overlay">
+                    <i class="bi bi-paint-bucket"></i>
+                </button>
+                <div id="paint-panel" class="paint-panel">
+                    <div class="paint-panel-content">
+                        <h4>Paint Overlay</h4>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="paintToggle">
+                            <label class="form-check-label" for="paintToggle">
+                                Enable Paint
+                            </label>
+                        </div>
+                        <div class="control-group">
+                            <label for="paintColor">Paint Color</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="paintColor" class="form-control form-control-color" value="#000000">
+                                <span class="color-value" id="paintColorValue">#000000</span>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <h5>Paint Opacity</h5>
+                            <input type="range" id="paintOpacity" class="form-range" min="0" max="100" value="100">
+                            <span id="paintOpacityValue">100%</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="textBtn" class="toolbar-btn" title="Add Text">
+                    <i class="bi bi-type"></i>
+                </button>
+                <div id="text-modal" class="text-modal">
+                    <div class="text-modal-content">
+                        <h4>Add Text</h4>
+                        <textarea id="textInput" class="form-control" placeholder="Enter text..." rows="3"></textarea>
+                        
+                        <div class="font-controls">
+                            <h5>Font Settings</h5>
+                            
+                            <div class="control-group">
+                                <label for="fontFamily">Font Family</label>
+                                <select id="fontFamily" class="form-control form-control-sm">
+                                    <option value="Arial, sans-serif">Arial</option>
+                                    <option value="'Roboto', sans-serif">Roboto</option>
+                                    <option value="'Lora', serif">Lora</option>
+                                    <option value="'Montserrat', sans-serif">Montserrat</option>
+                                    <option value="Georgia, serif">Georgia</option>
+                                    <option value="'Times New Roman', serif">Times New Roman</option>
+                                </select>
+                            </div>
+                            
+                            <div class="control-group">
+                                <label for="fontSize">Font Size</label>
+                                <input type="number" id="fontSize" class="form-control form-control-sm" value="24" min="8" max="120" step="1">
+                            </div>
+                            
+                            <div class="control-group">
+                                <label for="fontColor">Font Color</label>
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="fontColor" class="form-control form-control-color" value="#212529">
+                                    <span class="color-value" id="colorValue">#212529</span>
+                                </div>
+                            </div>
+                            
+                            <div class="control-group">
+                                <label>Font Style</label>
+                                <div class="style-buttons">
+                                    <button type="button" id="fontBold" class="btn btn-outline-secondary btn-sm" title="Bold">
+                                        <strong>B</strong>
+                                    </button>
+                                    <button type="button" id="fontItalic" class="btn btn-outline-secondary btn-sm" title="Italic">
+                                        <em>I</em>
+                                    </button>
+                                    <button type="button" id="fontUnderline" class="btn btn-outline-secondary btn-sm" title="Underline">
+                                        <u>U</u>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-modal-buttons">
+                            <button id="applyTextBtn" class="btn btn-primary btn-sm">Apply</button>
+                            <button id="deleteTextBtn" class="btn btn-danger btn-sm">Delete</button>
+                            <button id="clearTextBtn" class="btn btn-secondary btn-sm">Clear</button>
+                        </div>
+                    </div>
+                </div>
+                <button id="printBtn" class="toolbar-btn" title="Print/Download as PDF">
+                    <i class="bi bi-printer"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="main-content d-flex flex-column">
+            <header class="py-1 text-center">
+                <h1 class="display-6 mb-0">Collage Asset Generator</h1>
+            </header>
+
+            <div id="content-area" style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%;">
+                <div id="letter-page" class="letter-page">
+                    <div id="collage-container" class="collage-container">
+                        <!-- Grid will be populated by JavaScript -->
+                    </div>
+                    <div id="text-overlay" class="text-overlay" style="display: none;">
+                        <span id="text-content"></span>
+                    </div>
+                    <div id="generate-overlay" class="generate-overlay">
+                        <button id="generateBtn" class="btn btn-primary btn-lg">Generate Assets</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="images.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
