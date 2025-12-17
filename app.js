@@ -1,5 +1,63 @@
 // Collage Asset Generator Application
 
+// Alert Helper Function
+// ============================================================
+
+function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alert-container');
+    const alertId = 'alert-' + Date.now();
+    const alertHtml = `
+        <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert" style="margin-bottom: 10px;">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    alertContainer.insertAdjacentHTML('beforeend', alertHtml);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alert = document.getElementById(alertId);
+        if (alert) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }
+    }, 5000);
+}
+
+function showConfirmation(message, onConfirm, onCancel) {
+    const alertContainer = document.getElementById('alert-container');
+    const confirmId = 'confirm-' + Date.now();
+    const confirmHtml = `
+        <div id="${confirmId}" class="alert alert-warning alert-dismissible fade show" role="alert" style="margin-bottom: 10px;">
+            <div style="margin-bottom: 10px;">${message}</div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-sm btn-danger confirm-yes">Yes, Delete</button>
+                <button type="button" class="btn btn-sm btn-secondary confirm-no">Cancel</button>
+            </div>
+        </div>
+    `;
+    alertContainer.insertAdjacentHTML('beforeend', confirmHtml);
+    
+    const confirmElement = document.getElementById(confirmId);
+    const yesBtn = confirmElement.querySelector('.confirm-yes');
+    const noBtn = confirmElement.querySelector('.confirm-no');
+    
+    function cleanup() {
+        const bsAlert = new bootstrap.Alert(confirmElement);
+        bsAlert.close();
+    }
+    
+    yesBtn.addEventListener('click', () => {
+        onConfirm();
+        cleanup();
+    });
+    
+    noBtn.addEventListener('click', () => {
+        if (onCancel) onCancel();
+        cleanup();
+    });
+}
+
 // Track selected tags for filtering
 let selectedTags = [];
 
@@ -648,7 +706,7 @@ function saveAsJPG() {
     const collageContainer = document.querySelector('.collage-container.active');
     
     if (!collageContainer) {
-        alert('No collage to save');
+        showAlert('No collage to save', 'warning');
         return;
     }
     
@@ -671,7 +729,7 @@ function saveAsJPG() {
     let totalImages = images.length;
     
     if (totalImages === 0) {
-        alert('No images in collage');
+        showAlert('No images in collage', 'warning');
         return;
     }
     
@@ -898,6 +956,7 @@ function closeAllFlyouts() {
     textModal.classList.remove('show');
     overlayPanel.classList.remove('show');
     paintPanel.classList.remove('show');
+    document.getElementById('saves-panel').classList.remove('show');
 }
 
 filterBtn.addEventListener('click', function(e) {
@@ -1065,6 +1124,9 @@ paintToggle.addEventListener('change', function() {
 
 // Close dropdown when clicking outside
 document.addEventListener('click', function(e) {
+    const savesBtn = document.getElementById('savesBtn');
+    const savesPanel = document.getElementById('saves-panel');
+    
     if (!filterBtn.contains(e.target) && !dropdown.contains(e.target)) {
         dropdown.classList.remove('show');
     }
@@ -1082,6 +1144,9 @@ document.addEventListener('click', function(e) {
     }
     if (!paintBtn.contains(e.target) && !paintPanel.contains(e.target)) {
         paintPanel.classList.remove('show');
+    }
+    if (!savesBtn.contains(e.target) && !savesPanel.contains(e.target)) {
+        savesPanel.classList.remove('show');
     }
 });
 
@@ -1583,10 +1648,11 @@ function renderSavesList() {
     list.querySelectorAll('.save-item-delete').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (confirm('Delete this collage?')) {
-                deleteCollageFromStorage(parseInt(btn.dataset.id));
+            const id = parseInt(btn.dataset.id);
+            showConfirmation('Delete this collage?', () => {
+                deleteCollageFromStorage(id);
                 renderSavesList();
-            }
+            });
         });
     });
 }
@@ -1620,9 +1686,9 @@ function importSavesFromJSON(file) {
             
             localStorage.setItem('collage-saves', JSON.stringify(merged));
             renderSavesList();
-            alert('Saves imported successfully!');
+            showAlert('Saves imported successfully!', 'success');
         } catch (err) {
-            alert('Error importing saves: ' + err.message);
+            showAlert('Error importing saves: ' + err.message, 'danger');
         }
     };
     reader.readAsText(file);
@@ -1701,10 +1767,10 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
         // Desktop: Copy to clipboard
         try {
             await navigator.clipboard.writeText(shareUrl);
-            alert('URL has been copied to clipboard');
+            showAlert('URL has been copied to clipboard', 'success');
         } catch (err) {
             console.error('Failed to copy to clipboard:', err);
-            alert('Failed to copy URL to clipboard');
+            showAlert('Failed to copy URL to clipboard', 'danger');
         }
     }
 });
@@ -1722,7 +1788,7 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('confirmSaveBtn').addEventListener('click', () => {
     const name = document.getElementById('collageNameInput').value.trim();
     if (!name) {
-        alert('Please enter a name for the collage');
+        showAlert('Please enter a name for the collage', 'warning');
         return;
     }
     
@@ -1739,7 +1805,7 @@ document.getElementById('confirmSaveBtn').addEventListener('click', () => {
     heartBtn.classList.add('filled');
     heartBtn.innerHTML = '<i class="bi bi-heart-fill"></i>';
     
-    alert('Collage saved successfully!');
+    showAlert('Collage saved successfully!', 'success');
 });
 
 document.getElementById('exportSavesBtn').addEventListener('click', exportSavesToJSON);
