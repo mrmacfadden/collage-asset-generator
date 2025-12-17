@@ -97,6 +97,9 @@ let assetsGenerated = false;
 let currentCollageLayout = null;
 let currentCollageImages = [];
 
+// Flag to prevent re-rendering when loading from URL
+let loadingFromURL = false;
+
 // Layout patterns with grid positions
 const layoutPatterns = [
     // Pattern 1: One half + two quarters
@@ -584,7 +587,10 @@ function initializeTagFilters() {
             } else {
                 selectedTags = selectedTags.filter(t => t !== tag);
             }
-            renderCollage();
+            // Only render if we're not locked to URL images
+            if (!currentCollageImages.length || loadingFromURL) {
+                renderCollage();
+            }
             resetHeartButton();
         });
         
@@ -668,6 +674,11 @@ function initializeSVGEffects() {
             slider.addEventListener('input', function() {
                 effectIntensity.blur = parseInt(this.value);
                 valueDisplay.textContent = this.value + 'px';
+                // Update SVG filter blur value
+                const blurFilter = document.getElementById('blur-filter');
+                if (blurFilter) {
+                    blurFilter.setAttribute('stdDeviation', this.value);
+                }
                 applySVGEffects();
                 resetHeartButton();
             });
@@ -692,6 +703,9 @@ function initializeSVGEffects() {
             }
             applySVGEffects();
             resetHeartButton();
+            // Update URL with new effects
+            const settings = getCollageSettings();
+            encodeSettingsToURL(settings);
         });
         
         effectsContainer.appendChild(effectWrapper);
@@ -1435,142 +1449,171 @@ function updateUIFromSettings() {
 
 function encodeSettingsToURL(settings) {
     try {
-        const collageData = {
-            images: settings.collageImages,
-            layout: settings.collageLayout,
-            tags: settings.selectedTags,
-            effects: settings.selectedEffects,
-            blur: settings.effectIntensity.blur,
-            text: settings.textOverlayContent,
-            fontFamily: settings.textFontFamily,
-            fontSize: settings.textFontSize,
-            fontColor: settings.textFontColor,
-            fontBold: settings.textFontBold,
-            fontItalic: settings.textFontItalic,
-            overlay: settings.selectedOverlay,
-            overlayOpacity: settings.overlayOpacity,
-            paintColor: settings.paintColor,
-            paintOpacity: settings.paintOpacity,
-            paintEnabled: settings.paintEnabled,
-            customImage: settings.customImageUrl
-        };
+        const params = new URLSearchParams();
         
-        // Convert to JSON, then to base64url for URL safety
-        const jsonString = JSON.stringify(collageData);
-        const encoded = btoa(unescape(encodeURIComponent(jsonString)))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=/g, '');
+        // Layout
+        if (settings.collageLayout) {
+            params.set('layout', settings.collageLayout.name);
+        }
         
-        // Use query string parameter
-        window.history.replaceState(null, '', '?collage=' + encoded);
+        // Images - use ID indices for compact URLs
+        if (settings.collageImages && settings.collageImages.length > 0) {
+            const imageIds = settings.collageImages.map(img => {
+                const index = images.findIndex(globalImg => globalImg.path === img.path);
+                return index >= 0 ? index : -1; // -1 for custom/external images
+            });
+            params.set('images', imageIds.join(','));
+        }
+        
+        // Tags (filters applied)
+        if (settings.selectedTags && settings.selectedTags.length > 0) {
+            params.set('tags', settings.selectedTags.join(','));
+        }
+        
+        // Effects
+        if (settings.selectedEffects && settings.selectedEffects.length > 0) {
+            params.set('effects', settings.selectedEffects.join(','));
+        }
+        
+        // Blur intensity - only include if blur effect is actually selected
+        if (settings.selectedEffects && settings.selectedEffects.includes('blur') && settings.effectIntensity && settings.effectIntensity.blur) {
+            params.set('blur', settings.effectIntensity.blur);
+        }
+        
+        // Custom image URL
+        if (settings.customImageUrl) {
+            params.set('customImage', settings.customImageUrl);
+        }
+        
+        // Text overlay
+        if (settings.textOverlayContent) {
+            params.set('text', settings.textOverlayContent);
+            params.set('textFont', settings.textFontFamily);
+            params.set('textSize', settings.textFontSize);
+            // Store color without # to reduce URL encoding
+            params.set('textColor', settings.textFontColor.replace('#', ''));
+            params.set('textBold', settings.textFontBold ? '1' : '0');
+            params.set('textItalic', settings.textFontItalic ? '1' : '0');
+            params.set('textUnderline', settings.textFontUnderline ? '1' : '0');
+        }
+        
+        // Overlay
+        if (settings.selectedOverlay) {
+            params.set('overlay', settings.selectedOverlay);
+            params.set('overlayOpacity', settings.overlayOpacity);
+        }
+        
+        // Paint overlay
+        if (settings.paintEnabled) {
+            params.set('paint', '1');
+            // Store color without # to reduce URL encoding
+            params.set('paintColor', settings.paintColor.replace('#', ''));
+            params.set('paintOpacity', settings.paintOpacity);
+        }
+        
+        // Update URL with human-readable parameters
+        const queryString = params.toString();
+        window.history.replaceState(null, '', queryString ? '?' + queryString : '');
     } catch (e) {
         console.error('Error encoding collage to URL:', e);
     }
 }
 
 function decodeSettingsFromURL() {
-    // Get collage data from query string
+    // Get all parameters from query string
     const params = new URLSearchParams(window.location.search);
     const settings = {};
     
-    // Check if there's a collage parameter in query string with base64url encoded data
-    if (params.has('collage')) {
-        try {
-            let encoded = params.get('collage');
-            if (!encoded) {
-                console.warn('Collage parameter is empty');
-                return null;
+    // Check if there are any collage-related parameters
+    if (!params.has('layout') && !params.has('tags') && !params.has('effects') && 
+        !params.has('text') && !params.has('overlay') && !params.has('paint') && !params.has('images')) {
+        return null;
+    }
+    
+    try {
+        // Layout
+        if (params.has('layout')) {
+            const layoutName = params.get('layout');
+            const layout = layoutPatterns.find(l => l.name === layoutName);
+            if (layout) {
+                settings.collageLayout = layout;
             }
-            
-            // Convert from base64url to standard base64
-            let standardBase64 = encoded
-                .replace(/-/g, '+')
-                .replace(/_/g, '/');
-            
-            // Add back padding if needed
-            const padding = 4 - (standardBase64.length % 4);
-            if (padding < 4) {
-                standardBase64 += '='.repeat(padding);
-            }
-            
-            // Decode base64
-            let jsonString;
-            try {
-                jsonString = decodeURIComponent(escape(atob(standardBase64)));
-            } catch (e) {
-                console.warn('Standard decode failed, trying alternative method');
-                jsonString = atob(standardBase64);
-            }
-            
-            const collageData = JSON.parse(jsonString);
-            
-            // Validate that we have the expected data
-            if (!collageData.images || !Array.isArray(collageData.images)) {
-                console.warn('Invalid collage data: missing images');
-                return null;
-            }
-            
-            // Restore all settings from the decoded data
-            settings.selectedTags = collageData.tags || [];
-            settings.selectedEffects = collageData.effects || [];
-            settings.effectIntensity = { blur: collageData.blur || 3 };
-            settings.customImageUrl = collageData.customImage || '';
-            settings.textOverlayContent = collageData.text || '';
-            settings.textFontFamily = collageData.fontFamily || 'Arial, sans-serif';
-            settings.textFontSize = collageData.fontSize || 24;
-            settings.textFontColor = collageData.fontColor || '#212529';
-            settings.textFontBold = collageData.fontBold || false;
-            settings.textFontItalic = collageData.fontItalic || false;
-            settings.selectedOverlay = collageData.overlay || '';
-            settings.overlayOpacity = collageData.overlayOpacity || 100;
-            settings.paintColor = collageData.paintColor || '#FFFF00';
-            settings.paintOpacity = collageData.paintOpacity || 50;
-            settings.paintEnabled = collageData.paintEnabled || false;
-            settings.collageImages = collageData.images;
-            settings.collageLayout = collageData.layout;
-            
-            console.log('Successfully decoded collage from query with', collageData.images.length, 'images');
-            return settings;
-        } catch (e) {
-            console.error('Error decoding collage from query:', e);
-            return null;
         }
+        
+        // Images - decode from image ID indices
+        if (params.has('images')) {
+            try {
+                const imageIds = params.get('images').split(',').map(id => parseInt(id));
+                settings.collageImages = imageIds.map(id => {
+                    if (id >= 0 && id < images.length) {
+                        return images[id];
+                    }
+                    // ID out of range or -1 (custom), skip
+                    return null;
+                }).filter(img => img !== null);
+            } catch (e) {
+                console.warn('Could not decode images from URL:', e);
+                settings.collageImages = [];
+            }
+        } else {
+            settings.collageImages = [];
+        }
+        
+        // Tags (filters)
+        if (params.has('tags')) {
+            settings.selectedTags = params.get('tags').split(',').filter(t => t);
+        } else {
+            settings.selectedTags = [];
+        }
+        
+        // Effects
+        if (params.has('effects')) {
+            settings.selectedEffects = params.get('effects').split(',').filter(e => e);
+        } else {
+            settings.selectedEffects = [];
+        }
+        
+        // Blur intensity
+        settings.effectIntensity = { 
+            blur: params.has('blur') ? parseInt(params.get('blur')) : 3 
+        };
+        
+        // Custom image URL
+        settings.customImageUrl = params.get('customImage') || '';
+        
+        // Text overlay
+        settings.textOverlayContent = params.get('text') || '';
+        settings.textFontFamily = params.get('textFont') || 'Arial, sans-serif';
+        settings.textFontSize = params.has('textSize') ? parseInt(params.get('textSize')) : 24;
+        // Restore color with # prefix (URL stores without #)
+        const textColorValue = params.get('textColor') || '212529';
+        settings.textFontColor = textColorValue.startsWith('#') ? textColorValue : '#' + textColorValue;
+        settings.textFontBold = params.get('textBold') === '1';
+        settings.textFontItalic = params.get('textItalic') === '1';
+        settings.textFontUnderline = params.get('textUnderline') === '1';
+        
+        // Overlay
+        settings.selectedOverlay = params.get('overlay') || '';
+        settings.overlayOpacity = params.has('overlayOpacity') ? parseInt(params.get('overlayOpacity')) : 100;
+        
+        // Paint overlay
+        settings.paintEnabled = params.get('paint') === '1';
+        // Restore color with # prefix (URL stores without #)
+        const paintColorValue = params.get('paintColor') || 'FFFF00';
+        settings.paintColor = paintColorValue.startsWith('#') ? paintColorValue : '#' + paintColorValue;
+        settings.paintOpacity = params.has('paintOpacity') ? parseInt(params.get('paintOpacity')) : 50;
+        
+        // Only set collageLayout if we have images to render
+        if (!settings.collageImages || settings.collageImages.length === 0) {
+            settings.collageLayout = null;
+        }
+        
+        console.log('Successfully decoded collage from URL parameters');
+        return settings;
+    } catch (e) {
+        console.error('Error decoding collage from URL:', e);
+        return null;
     }
-    
-    // If no collage parameter, try to decode from legacy URL parameters
-    if (params.has('tags')) {
-        settings.selectedTags = params.get('tags').split(',');
-    }
-    if (params.has('effects')) {
-        settings.selectedEffects = params.get('effects').split(',');
-    }
-    if (params.has('blur')) {
-        if (!settings.effectIntensity) settings.effectIntensity = {};
-        settings.effectIntensity.blur = parseInt(params.get('blur'));
-    }
-    if (params.has('image')) {
-        settings.customImageUrl = decodeURIComponent(params.get('image'));
-    }
-    if (params.has('text')) {
-        settings.textOverlayContent = decodeURIComponent(params.get('text'));
-        settings.textFontFamily = params.get('fontFamily') || 'Arial, sans-serif';
-        settings.textFontSize = parseInt(params.get('fontSize')) || 24;
-        settings.textFontColor = '#' + (params.get('fontColor') || '212529');
-        settings.textFontBold = params.has('bold');
-        settings.textFontItalic = params.has('italic');
-    }
-    if (params.has('overlay')) {
-        settings.selectedOverlay = decodeURIComponent(params.get('overlay'));
-        settings.overlayOpacity = parseInt(params.get('overlayOpacity')) || 100;
-    }
-    if (params.has('paint')) {
-        settings.paintEnabled = true;
-        settings.paintColor = '#' + (params.get('paintColor') || 'FFFF00');
-        settings.paintOpacity = parseInt(params.get('paintOpacity')) || 50;
-    }
-    
-    return Object.keys(settings).length > 0 ? settings : null;
 }
 
 // ============================================================
@@ -1732,33 +1775,68 @@ document.getElementById('saveHeartBtn').addEventListener('click', () => {
 document.getElementById('shareBtn').addEventListener('click', async () => {
     const settings = getCollageSettings();
     
-    // Build the collage data and encode it
-    const collageData = {
-        images: settings.collageImages,
-        layout: settings.collageLayout,
-        tags: settings.selectedTags,
-        effects: settings.selectedEffects,
-        blur: settings.effectIntensity.blur,
-        text: settings.textOverlayContent,
-        fontFamily: settings.textFontFamily,
-        fontSize: settings.textFontSize,
-        fontColor: settings.textFontColor,
-        fontBold: settings.textFontBold,
-        fontItalic: settings.textFontItalic,
-        overlay: settings.selectedOverlay,
-        overlayOpacity: settings.overlayOpacity,
-        paintColor: settings.paintColor,
-        paintOpacity: settings.paintOpacity,
-        paintEnabled: settings.paintEnabled,
-        customImage: settings.customImageUrl
-    };
+    // Build human-readable query parameters
+    const params = new URLSearchParams();
     
-    const jsonString = JSON.stringify(collageData);
-    const encoded = btoa(unescape(encodeURIComponent(jsonString)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
-    const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encoded;
+    // Layout
+    if (settings.collageLayout) {
+        params.set('layout', settings.collageLayout.name);
+    }
+    
+    // Images - use ID indices for compact URLs
+    if (settings.collageImages && settings.collageImages.length > 0) {
+        const imageIds = settings.collageImages.map(img => {
+            const index = images.findIndex(globalImg => globalImg.path === img.path);
+            return index >= 0 ? index : -1; // -1 for custom/external images
+        });
+        params.set('images', imageIds.join(','));
+    }
+    
+    // Tags (filters applied)
+    if (settings.selectedTags && settings.selectedTags.length > 0) {
+        params.set('tags', settings.selectedTags.join(','));
+    }
+    
+    // Effects
+    if (settings.selectedEffects && settings.selectedEffects.length > 0) {
+        params.set('effects', settings.selectedEffects.join(','));
+    }
+    
+    // Blur intensity
+    if (settings.effectIntensity && settings.effectIntensity.blur) {
+        params.set('blur', settings.effectIntensity.blur);
+    }
+    
+    // Custom image URL
+    if (settings.customImageUrl) {
+        params.set('customImage', settings.customImageUrl);
+    }
+    
+    // Text overlay
+    if (settings.textOverlayContent) {
+        params.set('text', settings.textOverlayContent);
+        params.set('textFont', settings.textFontFamily);
+        params.set('textSize', settings.textFontSize);
+        params.set('textColor', settings.textFontColor);
+        params.set('textBold', settings.textFontBold ? '1' : '0');
+        params.set('textItalic', settings.textFontItalic ? '1' : '0');
+        params.set('textUnderline', settings.textFontUnderline ? '1' : '0');
+    }
+    
+    // Overlay
+    if (settings.selectedOverlay) {
+        params.set('overlay', settings.selectedOverlay);
+        params.set('overlayOpacity', settings.overlayOpacity);
+    }
+    
+    // Paint overlay
+    if (settings.paintEnabled) {
+        params.set('paint', '1');
+        params.set('paintColor', settings.paintColor);
+        params.set('paintOpacity', settings.paintOpacity);
+    }
+    
+    const shareUrl = window.location.origin + window.location.pathname + '?' + params.toString();
     
     // Check if Web Share API is available (mobile)
     if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
@@ -1848,7 +1926,9 @@ window.addEventListener('load', () => {
     const urlSettings = decodeSettingsFromURL();
     if (urlSettings && urlSettings.collageImages && urlSettings.collageImages.length > 0) {
         console.log('Loading collage from URL with', urlSettings.collageImages.length, 'images');
+        loadingFromURL = true;
         restoreCollageSettings(urlSettings);
+        loadingFromURL = false;
         
         // Mark as generated and show the collage immediately
         const generateOverlay = document.getElementById('generate-overlay');

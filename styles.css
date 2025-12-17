@@ -113,6 +113,33 @@ header h1 {
     opacity: 0.5;
 }
 
+.toolbar-favicon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.toolbar-favicon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 0.375rem;
+    display: block;
+    padding: 0;
+    margin: 0;
+}
+
+.toolbar-favicon:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+}
+
 .filter-dropdown {
     position: fixed;
     display: none !important;
