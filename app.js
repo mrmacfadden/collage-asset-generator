@@ -660,6 +660,7 @@ function initializeSVGEffects() {
             
             const slider = document.createElement('input');
             slider.type = 'range';
+            slider.id = 'blur-slider';
             slider.min = effect.min;
             slider.max = effect.max;
             slider.value = effectIntensity.blur;
@@ -681,6 +682,9 @@ function initializeSVGEffects() {
                 }
                 applySVGEffects();
                 resetHeartButton();
+                // Update URL with new blur value
+                const settings = getCollageSettings();
+                encodeSettingsToURL(settings);
             });
             
             sliderContainer.appendChild(sliderLabel);
@@ -1057,6 +1061,8 @@ applyTextBtn.addEventListener('click', function(e) {
     textOverlayContent = textInput.value.trim();
     updateTextOverlay();
     initializeTextInteractions();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 clearTextBtn.addEventListener('click', function() {
@@ -1064,6 +1070,8 @@ clearTextBtn.addEventListener('click', function() {
     textInput.value = '';
     textModal.classList.remove('show');
     updateTextOverlay();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
     resetHeartButton();
 });
 
@@ -1072,12 +1080,16 @@ fontFamily.addEventListener('change', function() {
     textFontFamily = this.value;
     updateTextOverlay();
     resetHeartButton();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 fontSize.addEventListener('change', function() {
     textFontSize = parseInt(this.value) || 24;
     updateTextOverlay();
     resetHeartButton();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 fontColor.addEventListener('change', function() {
@@ -1085,6 +1097,8 @@ fontColor.addEventListener('change', function() {
     colorValue.textContent = this.value.toUpperCase();
     updateTextOverlay();
     resetHeartButton();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 fontBold.addEventListener('click', function(e) {
@@ -1092,6 +1106,8 @@ fontBold.addEventListener('click', function(e) {
     textFontBold = !textFontBold;
     this.classList.toggle('active');
     updateTextOverlay();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 fontItalic.addEventListener('click', function(e) {
@@ -1099,6 +1115,8 @@ fontItalic.addEventListener('click', function(e) {
     textFontItalic = !textFontItalic;
     this.classList.toggle('active');
     updateTextOverlay();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 fontUnderline.addEventListener('click', function(e) {
@@ -1106,6 +1124,8 @@ fontUnderline.addEventListener('click', function(e) {
     textFontUnderline = !textFontUnderline;
     this.classList.toggle('active');
     updateTextOverlay();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 overlayOpacitySlider.addEventListener('input', function() {
@@ -1113,6 +1133,8 @@ overlayOpacitySlider.addEventListener('input', function() {
     opacityValue.textContent = overlayOpacity + '%';
     applyOverlay();
     resetHeartButton();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 paintColorInput.addEventListener('change', function() {
@@ -1120,6 +1142,8 @@ paintColorInput.addEventListener('change', function() {
     paintColorValue.textContent = this.value.toUpperCase();
     applyPaintOverlay();
     resetHeartButton();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 paintOpacitySlider.addEventListener('input', function() {
@@ -1127,11 +1151,15 @@ paintOpacitySlider.addEventListener('input', function() {
     paintOpacityValue.textContent = paintOpacity + '%';
     applyPaintOverlay();
     resetHeartButton();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
 });
 
 paintToggle.addEventListener('change', function() {
     paintEnabled = this.checked;
     renderCollage(); // Re-render to apply/remove grayscale
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
     applyPaintOverlay();
     resetHeartButton();
 });
@@ -1215,6 +1243,9 @@ function initializeOverlays() {
             selectedOverlay = this.value;
             applyOverlay();
             resetHeartButton();
+            // Update URL with new overlay selection
+            const settings = getCollageSettings();
+            encodeSettingsToURL(settings);
         });
         
         label.appendChild(radio);
@@ -1365,17 +1396,32 @@ function updateUIFromSettings() {
     });
     
     // Update effect checkboxes and slider
-    document.querySelectorAll('.effect-checkbox').forEach(checkbox => {
+    document.querySelectorAll('.blend-mode-radio').forEach(checkbox => {
         checkbox.checked = selectedEffects.includes(checkbox.value);
+        // Also show/hide slider if it's a blur effect
+        if (checkbox.value === 'blur') {
+            const sliderContainer = checkbox.closest('div').querySelector('div[style*="display"]');
+            if (sliderContainer) {
+                sliderContainer.style.display = checkbox.checked ? 'flex' : 'none';
+            }
+        }
     });
     
-    const blurSlider = document.getElementById('blurSlider');
+    // Update blur slider value and display
+    const blurSlider = document.getElementById('blur-slider');
     if (blurSlider) {
         blurSlider.value = effectIntensity.blur;
+        // Update the value display next to the slider
+        const valueDisplay = blurSlider.parentElement.querySelector('span');
+        if (valueDisplay) {
+            valueDisplay.textContent = effectIntensity.blur + 'px';
+        }
     }
-    const blurValue = document.getElementById('blurValue');
-    if (blurValue) {
-        blurValue.textContent = effectIntensity.blur;
+    
+    // Update SVG blur filter
+    const blurFilter = document.getElementById('blur-filter');
+    if (blurFilter) {
+        blurFilter.setAttribute('stdDeviation', effectIntensity.blur);
     }
     
     // Update image URL
