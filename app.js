@@ -644,6 +644,43 @@ function saveAsJPG() {
     }
     
     function drawAllImages() {
+        // Build filter string from selected effects
+        let filterString = '';
+        selectedEffects.forEach(effect => {
+            switch (effect) {
+                case 'blur':
+                    const blurAmount = effectIntensity.blur;
+                    filterString += `blur(${blurAmount}px) `;
+                    break;
+                case 'sharpen':
+                    filterString += 'contrast(1.5) brightness(1.1) ';
+                    break;
+                case 'sepia':
+                    filterString += 'sepia(1) ';
+                    break;
+                case 'highcontrast':
+                    filterString += 'contrast(2) saturate(2) ';
+                    break;
+                case 'vintage':
+                    filterString += 'sepia(0.6) contrast(0.8) brightness(0.9) ';
+                    break;
+                case 'posterize':
+                    filterString += 'contrast(1.5) saturate(1.5) ';
+                    break;
+                case 'emboss':
+                    filterString += 'contrast(2) grayscale(0.3) ';
+                    break;
+                case 'glitch':
+                    filterString += 'hue-rotate(45deg) saturate(1.5) ';
+                    break;
+            }
+        });
+        
+        // Apply the filter to canvas context
+        if (filterString) {
+            ctx.filter = filterString.trim();
+        }
+        
         // Render each image onto the canvas
         images.forEach((imgElement) => {
             try {
@@ -694,6 +731,34 @@ function saveAsJPG() {
                 console.warn('Error drawing image:', e);
             }
         });
+        
+        // Render text overlay if present
+        if (textOverlayContent) {
+            ctx.filter = 'none'; // Reset filter for text
+            const textOverlay = document.getElementById('text-overlay');
+            const textRect = textOverlay.getBoundingClientRect();
+            const containerRect = collageContainer.getBoundingClientRect();
+            
+            // Calculate scale factor from screen to canvas
+            const scaleY = canvasHeight / containerRect.height;
+            
+            // Calculate text position on canvas
+            const centerX = (textRect.left - containerRect.left) / containerRect.width * canvasWidth + (textRect.width / containerRect.width * canvasWidth) / 2;
+            const centerY = (textRect.top - containerRect.top) / containerRect.height * canvasHeight + (textRect.height / containerRect.height * canvasHeight) / 2;
+            
+            // Scale font size to canvas
+            const scaledFontSize = textFontSize * scaleY;
+            
+            // Set text properties
+            const fontStyle = `${textFontItalic ? 'italic ' : ''}${textFontBold ? 'bold ' : ''}${Math.round(scaledFontSize)}px ${textFontFamily}`;
+            ctx.font = fontStyle;
+            ctx.fillStyle = textFontColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Draw text
+            ctx.fillText(textOverlayContent, centerX, centerY);
+        }
         
         // Convert to JPG and download
         const link = document.createElement('a');
