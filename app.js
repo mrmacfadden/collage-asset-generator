@@ -1434,9 +1434,6 @@ function updateUIFromSettings() {
 }
 
 function encodeSettingsToURL(settings) {
-    const params = new URLSearchParams();
-    
-    // Compress and encode the full collage data into the URL
     try {
         const collageData = {
             images: settings.collageImages,
@@ -1464,25 +1461,25 @@ function encodeSettingsToURL(settings) {
             .replace(/\+/g, '-')
             .replace(/\//g, '_')
             .replace(/=/g, '');
-        params.set('collage', encoded);
         
-        const queryString = params.toString();
-        if (queryString) {
-            window.history.replaceState(null, '', '?' + queryString);
-        }
+        // Use hash instead of query string - more reliable for sharing
+        window.history.replaceState(null, '', '#collage=' + encoded);
     } catch (e) {
         console.error('Error encoding collage to URL:', e);
     }
 }
 
 function decodeSettingsFromURL() {
+    // Try to get collage data from hash first (for sharing)
+    const hash = window.location.hash.substring(1);
+    const hashParams = new URLSearchParams(hash);
     const params = new URLSearchParams(window.location.search);
     const settings = {};
     
-    // Check if there's a collage parameter with base64 encoded data
-    if (params.has('collage')) {
+    // Check if there's a collage parameter in hash with base64url encoded data
+    if (hashParams.has('collage')) {
         try {
-            let encoded = params.get('collage');
+            let encoded = hashParams.get('collage');
             if (!encoded) {
                 console.warn('Collage parameter is empty');
                 return null;
@@ -1536,11 +1533,75 @@ function decodeSettingsFromURL() {
             settings.collageImages = collageData.images;
             settings.collageLayout = collageData.layout;
             
-            console.log('Successfully decoded collage from URL with', collageData.images.length, 'images');
+            console.log('Successfully decoded collage from hash with', collageData.images.length, 'images');
             return settings;
         } catch (e) {
-            console.error('Error decoding collage from URL:', e);
-            console.error('Encoded string length:', params.get('collage').length);
+            console.error('Error decoding collage from hash:', e);
+            console.error('Encoded string length:', hashParams.get('collage').length);
+            return null;
+        }
+    }
+    
+    // Check if there's a collage parameter in query string (legacy)
+    if (params.has('collage')) {
+        try {
+            let encoded = params.get('collage');
+            if (!encoded) {
+                console.warn('Collage parameter is empty');
+                return null;
+            }
+            
+            // Convert from base64url to standard base64
+            let standardBase64 = encoded
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+            
+            // Add back padding if needed
+            const padding = 4 - (standardBase64.length % 4);
+            if (padding < 4) {
+                standardBase64 += '='.repeat(padding);
+            }
+            
+            // Decode base64
+            let jsonString;
+            try {
+                jsonString = decodeURIComponent(escape(atob(standardBase64)));
+            } catch (e) {
+                console.warn('Standard decode failed, trying alternative method');
+                jsonString = atob(standardBase64);
+            }
+            
+            const collageData = JSON.parse(jsonString);
+            
+            // Validate that we have the expected data
+            if (!collageData.images || !Array.isArray(collageData.images)) {
+                console.warn('Invalid collage data: missing images');
+                return null;
+            }
+            
+            // Restore all settings from the decoded data
+            settings.selectedTags = collageData.tags || [];
+            settings.selectedEffects = collageData.effects || [];
+            settings.effectIntensity = { blur: collageData.blur || 3 };
+            settings.customImageUrl = collageData.customImage || '';
+            settings.textOverlayContent = collageData.text || '';
+            settings.textFontFamily = collageData.fontFamily || 'Arial, sans-serif';
+            settings.textFontSize = collageData.fontSize || 24;
+            settings.textFontColor = collageData.fontColor || '#212529';
+            settings.textFontBold = collageData.fontBold || false;
+            settings.textFontItalic = collageData.fontItalic || false;
+            settings.selectedOverlay = collageData.overlay || '';
+            settings.overlayOpacity = collageData.overlayOpacity || 100;
+            settings.paintColor = collageData.paintColor || '#FFFF00';
+            settings.paintOpacity = collageData.paintOpacity || 50;
+            settings.paintEnabled = collageData.paintEnabled || false;
+            settings.collageImages = collageData.images;
+            settings.collageLayout = collageData.layout;
+            
+            console.log('Successfully decoded collage from query with', collageData.images.length, 'images');
+            return settings;
+        } catch (e) {
+            console.error('Error decoding collage from query:', e);
             return null;
         }
     }
@@ -1765,7 +1826,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=/g, '');
-    const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encoded;
+    const shareUrl = window.location.origin + window.location.pathname + '#collage=' + encoded;
     
     // Check if Web Share API is available (mobile)
     if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
