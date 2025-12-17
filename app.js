@@ -282,6 +282,7 @@ function getRandomLayout() {
 function renderCollage(forceImages = null, forceLayout = null) {
     const container = document.getElementById('collage-container');
     container.innerHTML = '';
+    console.log('RENDER: renderCollage called with forceImages:', forceImages?.map(i => i.path), 'forceLayout:', forceLayout?.name);
 
     let selectedImagesData;
     let layout;
@@ -292,6 +293,7 @@ function renderCollage(forceImages = null, forceLayout = null) {
         selectedImagesData = forceImages;
         layout = forceLayout;
         positions = layout.positions.slice(0);
+        console.log('RENDER: Using forced images:', selectedImagesData.map(i => i.path));
     } else {
         // Get filtered images based on selected tags
         const filteredImages = filterImagesByTags(selectedTags);
@@ -320,11 +322,13 @@ function renderCollage(forceImages = null, forceLayout = null) {
         // Select a random layout pattern
         layout = getRandomLayout();
         positions = layout.positions.slice(0);
+        console.log('RENDER: Random render - selected images:', selectedImagesData.map(i => i.path), 'layout:', layout.name);
     }
     
     // Store the current composition for later restoration
     currentCollageLayout = layout;
     currentCollageImages = selectedImagesData;
+    console.log('RENDER: Updated currentCollageImages to:', currentCollageImages.map(i => i.path));
 
     // If layout doesn't have enough positions, adjust
     if (positions.length > selectedImagesData.length) {
@@ -592,8 +596,9 @@ function initializeTagFilters() {
             } else {
                 selectedTags = selectedTags.filter(t => t !== tag);
             }
-            // Only render if we're not locked to URL images
-            if (!currentCollageImages.length || loadingFromURL) {
+            // Only render if we're not loading from URL and have images locked in
+            if (!loadingFromURL && (!currentCollageImages.length)) {
+                console.log('Tag filter changed, re-rendering with random images');
                 renderCollage();
             }
             resetHeartButton();
@@ -1264,16 +1269,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const collageContainer = document.getElementById('collage-container');
     
     generateBtn.addEventListener('click', function() {
+        console.log('===== GENERATE BUTTON CLICKED =====');
         generateOverlay.classList.add('hidden');
         collageContainer.classList.add('active');
         renderCollage();
+        console.log('After renderCollage - currentCollageImages:', currentCollageImages.map(i => i.path));
         assetsGenerated = true;
         setToolbarButtonsEnabled(true);
         
         // Update URL with current collage settings
         setTimeout(() => {
+            console.log('Before getCollageSettings - currentCollageImages:', currentCollageImages.map(i => i.path));
             const settings = getCollageSettings();
+            console.log('After getCollageSettings - settings.collageImages:', settings.collageImages.map(i => i.path));
             encodeSettingsToURL(settings);
+            console.log('After encodeSettingsToURL - URL:', window.location.href);
+            console.log('===== GENERATE COMPLETE =====');
         }, 100);
     });
     
@@ -1415,6 +1426,7 @@ function getCollageSettings() {
 
 function restoreCollageSettings(settings) {
     if (!settings) return;
+    console.log('RESTORE: Starting restore with settings.collageImages:', settings.collageImages?.map(i => i.path));
     
     selectedTags = settings.selectedTags || [];
     selectedEffects = settings.selectedEffects || [];
@@ -1438,14 +1450,17 @@ function restoreCollageSettings(settings) {
     // Restore the collage composition if available
     currentCollageImages = settings.collageImages || [];
     currentCollageLayout = settings.collageLayout || null;
+    console.log('RESTORE: Set currentCollageImages to:', currentCollageImages.map(i => i.path));
     
     // Update UI elements
     updateUIFromSettings();
     
     // Render with specific images/layout if available, otherwise random
     if (currentCollageImages.length > 0 && currentCollageLayout) {
+        console.log('RESTORE: Rendering with specific images:', currentCollageImages.map(i => i.path));
         renderCollage(currentCollageImages, currentCollageLayout);
     } else {
+        console.log('RESTORE: Rendering with random images');
         renderCollage();
     }
     
@@ -1584,6 +1599,9 @@ function updateUIFromSettings() {
 
 function encodeSettingsToURL(settings) {
     try {
+        console.log('=== ENCODE START ===');
+        console.log('Global images array:', images?.map(i => i.path));
+        console.log('Settings collageImages:', settings?.collageImages?.map(i => i.path));
         const params = new URLSearchParams();
         
         // Layout
@@ -1591,13 +1609,14 @@ function encodeSettingsToURL(settings) {
             params.set('layout', settings.collageLayout.name);
         }
         
-        // Images - use ID indices for compact URLs
+        // Images - use stable IDs for compact URLs
         if (settings.collageImages && settings.collageImages.length > 0) {
-            const imageIds = settings.collageImages.map(img => {
-                const index = images.findIndex(globalImg => globalImg.path === img.path);
-                return index >= 0 ? index : -1; // -1 for custom/external images
-            });
-            params.set('images', imageIds.join(','));
+            const imageIds = settings.collageImages.map(img => img.id).join(',');
+            console.log('ENCODE: Image paths:', settings.collageImages.map(i => i.path));
+            console.log('ENCODE: Image IDs:', imageIds);
+            params.set('images', imageIds);
+        } else {
+            console.log('ENCODE: No images to encode');
         }
         
         // Tags (filters applied)
@@ -1659,6 +1678,8 @@ function encodeSettingsToURL(settings) {
         
         // Update URL with human-readable parameters
         const queryString = params.toString();
+        console.log('=== ENCODE END ===');
+        console.log('Final URL:', window.location.origin + window.location.pathname + (queryString ? '?' + queryString : ''));
         window.history.replaceState(null, '', queryString ? '?' + queryString : '');
     } catch (e) {
         console.error('Error encoding collage to URL:', e);
@@ -1686,22 +1707,26 @@ function decodeSettingsFromURL() {
             }
         }
         
-        // Images - decode from image ID indices
+        // Images - decode from stable IDs
         if (params.has('images')) {
             try {
-                const imageIds = params.get('images').split(',').map(id => parseInt(id));
+                const rawImageParam = params.get('images');
+                console.log('DECODE: Raw images param from URL:', rawImageParam);
+                const imageIds = rawImageParam.split(',').map(id => parseInt(id));
+                console.log('DECODE: Image IDs:', imageIds);
+                console.log('DECODE: Global images array has:', images.map(i => `id:${i.id} path:${i.path}`));
                 settings.collageImages = imageIds.map(id => {
-                    if (id >= 0 && id < images.length) {
-                        return images[id];
-                    }
-                    // ID out of range or -1 (custom), skip
-                    return null;
+                    const imgObj = images.find(img => img.id === id);
+                    console.log('  Searching for id:', id, '=> found:', imgObj?.path || 'NOT FOUND');
+                    return imgObj || null;
                 }).filter(img => img !== null);
+                console.log('DECODE: Resolved to:', settings.collageImages.map(i => i.path));
             } catch (e) {
                 console.warn('Could not decode images from URL:', e);
                 settings.collageImages = [];
             }
         } else {
+            console.log('No images parameter in URL');
             settings.collageImages = [];
         }
         
@@ -1849,9 +1874,39 @@ function renderSavesList() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const id = parseInt(btn.dataset.id);
-            showConfirmation('Delete this collage?', () => {
+            const saveItem = btn.closest('.save-item');
+            const confirmId = 'confirm-' + Date.now();
+            const confirmHtml = `
+                <div id="${confirmId}" class="alert alert-warning alert-dismissible fade show" role="alert" style="margin-bottom: 10px;">
+                    <div style="margin-bottom: 10px;">Delete this collage?</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-sm btn-danger confirm-yes">Yes, Delete</button>
+                        <button type="button" class="btn btn-sm btn-secondary confirm-no">Cancel</button>
+                    </div>
+                </div>
+            `;
+            saveItem.insertAdjacentHTML('afterend', confirmHtml);
+            
+            const confirmElement = document.getElementById(confirmId);
+            const yesBtn = confirmElement.querySelector('.confirm-yes');
+            const noBtn = confirmElement.querySelector('.confirm-no');
+            
+            function cleanup() {
+                confirmElement.remove();
+            }
+            
+            yesBtn.addEventListener('click', () => {
                 deleteCollageFromStorage(id);
+                cleanup();
                 renderSavesList();
+                // Keep the panel open after deletion
+                setTimeout(() => {
+                    document.getElementById('saves-panel').classList.add('show');
+                }, 0);
+            });
+            
+            noBtn.addEventListener('click', () => {
+                cleanup();
             });
         });
     });
@@ -2073,7 +2128,10 @@ function setupURLUpdateListeners() {
 
 // Parse URL on page load
 window.addEventListener('load', () => {
+    console.log('===== PAGE LOAD START =====');
+    console.log('URL:', window.location.href);
     const urlSettings = decodeSettingsFromURL();
+    console.log('Decoded URL settings - images:', urlSettings?.collageImages?.map(i => i.path));
     if (urlSettings && urlSettings.collageImages && urlSettings.collageImages.length > 0) {
         console.log('Loading collage from URL with', urlSettings.collageImages.length, 'images');
         loadingFromURL = true;
@@ -2091,6 +2149,9 @@ window.addEventListener('load', () => {
         }
         assetsGenerated = true;
         setToolbarButtonsEnabled(true);
+    } else {
+        console.log('No URL settings found - page loaded without collage state');
     }
+    console.log('===== PAGE LOAD COMPLETE =====');
     setupURLUpdateListeners();
 });
