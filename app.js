@@ -80,6 +80,7 @@ let textFontColor = '#212529';
 let textFontBold = false;
 let textFontItalic = false;
 let textFontUnderline = false;
+let textZIndex = 110; // Default below paint overlay (120)
 
 // Track overlay settings
 let selectedOverlay = '';
@@ -1056,8 +1057,8 @@ clearImageBtn.addEventListener('click', function() {
     resetHeartButton();
 });
 
-applyTextBtn.addEventListener('click', function(e) {
-    e.stopPropagation();
+// Real-time text input
+textInput.addEventListener('input', function() {
     textOverlayContent = textInput.value.trim();
     updateTextOverlay();
     initializeTextInteractions();
@@ -1128,6 +1129,53 @@ fontUnderline.addEventListener('click', function(e) {
     encodeSettingsToURL(settings);
 });
 
+// Helper function to update text z-index button states
+function updateTextZIndexButtonStates() {
+    const bringForwardBtn = document.getElementById('textBringForward');
+    const sendBackwardBtn = document.getElementById('textSendBackward');
+    
+    // Paint overlay z-index is 120
+    const PAINT_ZINDEX = 120;
+    const TEXT_ABOVE = 130;
+    const TEXT_BELOW = 110;
+    
+    // Disable buttons if paint is not enabled
+    if (!paintEnabled) {
+        bringForwardBtn.disabled = true;
+        sendBackwardBtn.disabled = true;
+        return;
+    }
+    
+    // Enable/disable based on current text z-index
+    bringForwardBtn.disabled = textZIndex >= TEXT_ABOVE; // Already above paint
+    sendBackwardBtn.disabled = textZIndex <= TEXT_BELOW; // Already below paint
+}
+
+// Text z-index controls
+document.getElementById('textBringForward').addEventListener('click', function(e) {
+    e.preventDefault();
+    if (!paintEnabled) return;
+    
+    textZIndex = 130; // Above paint overlay (120)
+    document.getElementById('text-overlay').style.zIndex = textZIndex;
+    console.log('Text z-index brought forward (above paint):', textZIndex);
+    updateTextZIndexButtonStates();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
+});
+
+document.getElementById('textSendBackward').addEventListener('click', function(e) {
+    e.preventDefault();
+    if (!paintEnabled) return;
+    
+    textZIndex = 110; // Below paint overlay (120)
+    document.getElementById('text-overlay').style.zIndex = textZIndex;
+    console.log('Text z-index sent backward (below paint):', textZIndex);
+    updateTextZIndexButtonStates();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
+});
+
 overlayOpacitySlider.addEventListener('input', function() {
     overlayOpacity = parseInt(this.value);
     opacityValue.textContent = overlayOpacity + '%';
@@ -1158,6 +1206,7 @@ paintOpacitySlider.addEventListener('input', function() {
 paintToggle.addEventListener('change', function() {
     paintEnabled = this.checked;
     renderCollage(); // Re-render to apply/remove grayscale
+    updateTextZIndexButtonStates();
     const settings = getCollageSettings();
     encodeSettingsToURL(settings);
     applyPaintOverlay();
@@ -1219,6 +1268,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Disable toolbar buttons on page load
     setToolbarButtonsEnabled(false);
+    
+    // Disable text depth buttons until paint overlay is enabled
+    updateTextZIndexButtonStates();
 });
 
 function initializeOverlays() {
@@ -1310,6 +1362,10 @@ function initializeTextInteractions() {
                     
                     event.target.style.transform = `translate(${x}px, ${y}px) rotate(${parseFloat(event.target.dataset.angle) || 0}deg)`;
                     Object.assign(event.target.dataset, { x, y });
+                    
+                    // Save position to URL
+                    const settings = getCollageSettings();
+                    encodeSettingsToURL(settings);
                 }
             }
         });
@@ -1319,6 +1375,7 @@ function initializeTextInteractions() {
 // ============================================================
 
 function getCollageSettings() {
+    const textOverlay = document.getElementById('text-overlay');
     return {
         selectedTags: selectedTags,
         selectedEffects: selectedEffects,
@@ -1331,13 +1388,14 @@ function getCollageSettings() {
         textFontBold: textFontBold,
         textFontItalic: textFontItalic,
         textFontUnderline: textFontUnderline,
+        textX: textOverlay.dataset.x || 0,
+        textY: textOverlay.dataset.y || 0,
+        textZIndex: textZIndex,
         selectedOverlay: selectedOverlay,
         overlayOpacity: overlayOpacity,
         paintColor: paintColor,
         paintOpacity: paintOpacity,
         paintEnabled: paintEnabled,
-        textX: document.getElementById('text-overlay').style.left || '50%',
-        textY: document.getElementById('text-overlay').style.top || '50%',
         // Store the actual collage composition
         collageImages: currentCollageImages,
         collageLayout: currentCollageLayout
@@ -1358,6 +1416,7 @@ function restoreCollageSettings(settings) {
     textFontBold = settings.textFontBold || false;
     textFontItalic = settings.textFontItalic || false;
     textFontUnderline = settings.textFontUnderline || false;
+    textZIndex = settings.textZIndex || 100;
     selectedOverlay = settings.selectedOverlay || '';
     overlayOpacity = settings.overlayOpacity || 100;
     paintColor = settings.paintColor || '#FFFF00';
@@ -1379,7 +1438,25 @@ function restoreCollageSettings(settings) {
     }
     
     updateTextOverlay();
+    
+    // Restore text position and z-index
+    if (settings.textX || settings.textY || settings.textZIndex) {
+        const textOverlay = document.getElementById('text-overlay');
+        textOverlay.dataset.x = settings.textX || 0;
+        textOverlay.dataset.y = settings.textY || 0;
+        textOverlay.style.zIndex = settings.textZIndex || 100;
+        const angle = parseFloat(textOverlay.dataset.angle) || 0;
+        textOverlay.style.transform = `translate(${settings.textX || 0}px, ${settings.textY || 0}px) rotate(${angle}deg)`;
+        // Re-initialize interactions to make it still draggable
+        if (textOverlayContent) {
+            initializeTextInteractions();
+        }
+    }
+    
     applyPaintOverlay();
+    
+    // Update text z-index button states
+    updateTextZIndexButtonStates();
     
     // Fill the heart if this was a previously saved collage
     const heartBtn = document.getElementById('saveHeartBtn');
@@ -1541,6 +1618,17 @@ function encodeSettingsToURL(settings) {
             params.set('textBold', settings.textFontBold ? '1' : '0');
             params.set('textItalic', settings.textFontItalic ? '1' : '0');
             params.set('textUnderline', settings.textFontUnderline ? '1' : '0');
+            // Store text position
+            if (settings.textX && settings.textX !== '0') {
+                params.set('textX', settings.textX);
+            }
+            if (settings.textY && settings.textY !== '0') {
+                params.set('textY', settings.textY);
+            }
+            // Store text z-index if not default (110)
+            if (settings.textZIndex && settings.textZIndex !== 110) {
+                params.set('textZIndex', settings.textZIndex);
+            }
         }
         
         // Overlay
@@ -1637,6 +1725,10 @@ function decodeSettingsFromURL() {
         settings.textFontBold = params.get('textBold') === '1';
         settings.textFontItalic = params.get('textItalic') === '1';
         settings.textFontUnderline = params.get('textUnderline') === '1';
+        // Restore text position and z-index
+        settings.textX = params.has('textX') ? parseFloat(params.get('textX')) : 0;
+        settings.textY = params.has('textY') ? parseFloat(params.get('textY')) : 0;
+        settings.textZIndex = params.has('textZIndex') ? parseInt(params.get('textZIndex')) : 110;
         
         // Overlay
         settings.selectedOverlay = params.get('overlay') || '';
