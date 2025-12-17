@@ -1978,70 +1978,10 @@ document.getElementById('saveHeartBtn').addEventListener('click', () => {
 
 // Share button functionality
 document.getElementById('shareBtn').addEventListener('click', async () => {
-    const settings = getCollageSettings();
+    // Simply copy the current URL which already has all parameters encoded
+    const shareUrl = window.location.href;
     
-    // Build human-readable query parameters
-    const params = new URLSearchParams();
-    
-    // Layout
-    if (settings.collageLayout) {
-        params.set('layout', settings.collageLayout.name);
-    }
-    
-    // Images - use ID indices for compact URLs
-    if (settings.collageImages && settings.collageImages.length > 0) {
-        const imageIds = settings.collageImages.map(img => {
-            const index = images.findIndex(globalImg => globalImg.path === img.path);
-            return index >= 0 ? index : -1; // -1 for custom/external images
-        });
-        params.set('images', imageIds.join(','));
-    }
-    
-    // Tags (filters applied)
-    if (settings.selectedTags && settings.selectedTags.length > 0) {
-        params.set('tags', settings.selectedTags.join(','));
-    }
-    
-    // Effects
-    if (settings.selectedEffects && settings.selectedEffects.length > 0) {
-        params.set('effects', settings.selectedEffects.join(','));
-    }
-    
-    // Blur intensity
-    if (settings.effectIntensity && settings.effectIntensity.blur) {
-        params.set('blur', settings.effectIntensity.blur);
-    }
-    
-    // Custom image URL
-    if (settings.customImageUrl) {
-        params.set('customImage', settings.customImageUrl);
-    }
-    
-    // Text overlay
-    if (settings.textOverlayContent) {
-        params.set('text', settings.textOverlayContent);
-        params.set('textFont', settings.textFontFamily);
-        params.set('textSize', settings.textFontSize);
-        params.set('textColor', settings.textFontColor);
-        params.set('textBold', settings.textFontBold ? '1' : '0');
-        params.set('textItalic', settings.textFontItalic ? '1' : '0');
-        params.set('textUnderline', settings.textFontUnderline ? '1' : '0');
-    }
-    
-    // Overlay
-    if (settings.selectedOverlay) {
-        params.set('overlay', settings.selectedOverlay);
-        params.set('overlayOpacity', settings.overlayOpacity);
-    }
-    
-    // Paint overlay
-    if (settings.paintEnabled) {
-        params.set('paint', '1');
-        params.set('paintColor', settings.paintColor);
-        params.set('paintOpacity', settings.paintOpacity);
-    }
-    
-    const shareUrl = window.location.origin + window.location.pathname + '?' + params.toString();
+    console.log('Sharing URL:', shareUrl);
     
     // Check if Web Share API is available (mobile)
     if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {

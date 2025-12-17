@@ -46,10 +46,15 @@ header h1 {
     font-family: 'Poppins', sans-serif;
     font-size: 0.7rem;
     font-weight: 300;
-    opacity: 0.8;
+    opacity: 0.6;
     letter-spacing: 0.25em;
     text-decoration: none;
     text-transform: uppercase;
+    transition: opacity 0.2s;
+}
+
+header h1:hover {
+    opacity: 0.8;
 }
 
 .main-content {
@@ -680,6 +685,11 @@ header h1 {
         border: none !important;
         box-shadow: none !important;
     }
+    
+    #saveHeartBtn,
+    #shareBtn {
+        display: none !important;
+    }
 }
 
 .controls {
@@ -961,17 +971,21 @@ header h1 {
         height: 11in;
         margin: 0;
         padding: 0;
+        overflow: hidden;
     }
 
     .app-container {
         display: block;
         width: 8.5in;
         height: 11in;
+        overflow: hidden;
     }
 
     .left-toolbar,
     header,
-    .generate-overlay {
+    .generate-overlay,
+    .controls,
+    .right-sidebar {
         display: none !important;
     }
 
@@ -981,12 +995,14 @@ header h1 {
         height: 11in;
         padding: 0 !important;
         margin: 0 !important;
+        overflow: hidden;
     }
 
     .main-content {
         display: block;
-        height: auto;
+        height: 11in;
         width: 8.5in;
+        overflow: hidden;
     }
 
     .letter-page {
