@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap');@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Lora:wght@400;700&family=Montserrat:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300&display=swap');@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Lora:wght@400;700&family=Montserrat:wght@400;700&display=swap');
 :root {
     --page-width: 8.5in;
     --page-height: 11in;
@@ -43,11 +43,13 @@ header {
 }
 
 header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.25rem;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 300;
     opacity: 0.8;
-    font-weight: 700;
+    letter-spacing: 0.25em;
     text-decoration: none;
+    text-transform: uppercase;
 }
 
 .main-content {

@@ -407,6 +407,8 @@ function applyPaintOverlay() {
     const letterPage = document.querySelector('.letter-page');
     let paintElement = document.getElementById('paint-layer');
     
+    console.log('applyPaintOverlay called:', { paintEnabled, paintOpacity });
+    
     if (paintEnabled && paintOpacity > 0) {
         if (!paintElement) {
             // Create SVG with proper filters for print compatibility
@@ -473,7 +475,9 @@ function applyPaintOverlay() {
         const rect = paintElement.querySelector('.color-overlay-rect');
         if (rect) {
             rect.setAttribute('fill', paintColor);
-            rect.style.opacity = (paintOpacity / 100).toString();
+            const opacityValue = (paintOpacity / 100).toString();
+            rect.style.opacity = opacityValue;
+            console.log('Paint rect opacity set to:', opacityValue);
         }
     } else {
         if (paintElement) {
@@ -1197,7 +1201,14 @@ paintColorInput.addEventListener('change', function() {
 paintOpacitySlider.addEventListener('input', function() {
     paintOpacity = parseInt(this.value);
     paintOpacityValue.textContent = paintOpacity + '%';
-    applyPaintOverlay();
+    console.log('Paint opacity changed:', paintOpacity);
+    console.log('About to call applyPaintOverlay...');
+    try {
+        applyPaintOverlay();
+        console.log('applyPaintOverlay completed successfully');
+    } catch (e) {
+        console.error('Error in applyPaintOverlay:', e);
+    }
     resetHeartButton();
     const settings = getCollageSettings();
     encodeSettingsToURL(settings);
@@ -1422,6 +1433,7 @@ function restoreCollageSettings(settings) {
     paintColor = settings.paintColor || '#FFFF00';
     paintOpacity = settings.paintOpacity || 50;
     paintEnabled = settings.paintEnabled || false;
+    console.log('Restored paint settings:', { paintEnabled, paintColor, paintOpacity });
     
     // Restore the collage composition if available
     currentCollageImages = settings.collageImages || [];
@@ -1637,12 +1649,12 @@ function encodeSettingsToURL(settings) {
             params.set('overlayOpacity', settings.overlayOpacity);
         }
         
-        // Paint overlay
+        // Paint overlay - always save opacity slider value
+        params.set('paintOpacity', settings.paintOpacity);
         if (settings.paintEnabled) {
             params.set('paint', '1');
             // Store color without # to reduce URL encoding
             params.set('paintColor', settings.paintColor.replace('#', ''));
-            params.set('paintOpacity', settings.paintOpacity);
         }
         
         // Update URL with human-readable parameters
