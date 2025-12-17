@@ -146,11 +146,53 @@
                 <button id="printBtn" class="toolbar-btn" title="Print/Download as PDF">
                     <i class="bi bi-printer"></i>
                 </button>
-                <button id="saveBtn" class="toolbar-btn" title="Save as JPG">
+                <button id="downloadJpgBtn" class="toolbar-btn" title="Download as JPG">
                     <i class="bi bi-download"></i>
                 </button>
+                <button id="savesBtn" class="toolbar-btn" title="Saved Collages">
+                    <i class="bi bi-folder"></i>
+                </button>
+                <div id="saves-panel" class="saves-panel">
+                    <div class="saves-panel-content">
+                        <h4>Saved Collages</h4>
+                        <div id="saves-list" class="saves-list">
+                            <!-- Saved collages will be populated here -->
+                        </div>
+                        <div class="saves-controls">
+                            <button id="exportSavesBtn" class="btn btn-primary btn-sm w-100 mb-2" title="Export all saves as JSON">
+                                <i class="bi bi-download"></i> Export
+                            </button>
+                            <button id="importSavesBtn" class="btn btn-secondary btn-sm w-100" title="Import saves from JSON">
+                                <i class="bi bi-upload"></i> Import
+                            </button>
+                            <input type="file" id="importsavesFile" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                </div>
             </div>
         </aside>
+
+        <!-- Save Collage Modal -->
+        <div id="save-modal" class="modal fade" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Save Collage</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="collageNameInput" class="form-label">Collage Name</label>
+                            <input type="text" class="form-control" id="collageNameInput" placeholder="Enter a name for this collage...">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="confirmSaveBtn">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Content -->
         <div class="main-content d-flex flex-column">
@@ -170,6 +212,12 @@
                         <button id="generateBtn" class="btn btn-primary btn-lg">Generate Assets</button>
                     </div>
                 </div>
+                <button id="saveHeartBtn" class="save-heart-btn" title="Save Collage">
+                    <i class="bi bi-heart"></i>
+                </button>
+                <button id="shareBtn" class="share-btn" title="Share Collage">
+                    <i class="bi bi-share"></i>
+                </button>
             </div>
         </div>
     </div>
