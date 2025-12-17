@@ -1748,7 +1748,7 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     
     const jsonString = JSON.stringify(collageData);
     const encoded = btoa(unescape(encodeURIComponent(jsonString)));
-    const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encoded;
+    const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encodeURIComponent(encoded);
     
     // Check if Web Share API is available (mobile)
     if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
