@@ -1460,7 +1460,9 @@ function encodeSettingsToURL(settings) {
         
         // Convert to JSON, then to base64 for URL safety
         const jsonString = JSON.stringify(collageData);
-        const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+        let encoded = btoa(unescape(encodeURIComponent(jsonString)));
+        // Remove base64 padding to avoid URL parsing issues
+        encoded = encoded.replace(/=+$/, '');
         params.set('collage', encoded);
         
         const queryString = params.toString();
@@ -1479,10 +1481,16 @@ function decodeSettingsFromURL() {
     // Check if there's a collage parameter with base64 encoded data
     if (params.has('collage')) {
         try {
-            const encoded = params.get('collage');
+            let encoded = params.get('collage');
             if (!encoded) {
                 console.warn('Collage parameter is empty');
                 return null;
+            }
+            
+            // Add back base64 padding if needed
+            const padding = 4 - (encoded.length % 4);
+            if (padding < 4) {
+                encoded += '='.repeat(padding);
             }
             
             // Decode base64
@@ -1747,7 +1755,9 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     };
     
     const jsonString = JSON.stringify(collageData);
-    const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+    let encoded = btoa(unescape(encodeURIComponent(jsonString)));
+    // Remove base64 padding to avoid URL parsing issues
+    encoded = encoded.replace(/=+$/, '');
     const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encodeURIComponent(encoded);
     
     // Check if Web Share API is available (mobile)
