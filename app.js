@@ -1458,11 +1458,12 @@ function encodeSettingsToURL(settings) {
             customImage: settings.customImageUrl
         };
         
-        // Convert to JSON, then to base64 for URL safety
+        // Convert to JSON, then to base64url for URL safety
         const jsonString = JSON.stringify(collageData);
-        let encoded = btoa(unescape(encodeURIComponent(jsonString)));
-        // Remove base64 padding to avoid URL parsing issues
-        encoded = encoded.replace(/=+$/, '');
+        const encoded = btoa(unescape(encodeURIComponent(jsonString)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
         params.set('collage', encoded);
         
         const queryString = params.toString();
@@ -1487,20 +1488,25 @@ function decodeSettingsFromURL() {
                 return null;
             }
             
-            // Add back base64 padding if needed
-            const padding = 4 - (encoded.length % 4);
+            // Convert from base64url to standard base64
+            let standardBase64 = encoded
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+            
+            // Add back padding if needed
+            const padding = 4 - (standardBase64.length % 4);
             if (padding < 4) {
-                encoded += '='.repeat(padding);
+                standardBase64 += '='.repeat(padding);
             }
             
             // Decode base64
             let jsonString;
             try {
-                jsonString = decodeURIComponent(escape(atob(encoded)));
+                jsonString = decodeURIComponent(escape(atob(standardBase64)));
             } catch (e) {
                 // Try alternative decoding method
                 console.warn('Standard decode failed, trying alternative method');
-                jsonString = atob(encoded);
+                jsonString = atob(standardBase64);
             }
             
             const collageData = JSON.parse(jsonString);
@@ -1755,10 +1761,11 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     };
     
     const jsonString = JSON.stringify(collageData);
-    let encoded = btoa(unescape(encodeURIComponent(jsonString)));
-    // Remove base64 padding to avoid URL parsing issues
-    encoded = encoded.replace(/=+$/, '');
-    const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encodeURIComponent(encoded);
+    const encoded = btoa(unescape(encodeURIComponent(jsonString)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+    const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encoded;
     
     // Check if Web Share API is available (mobile)
     if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
