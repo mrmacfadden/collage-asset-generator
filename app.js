@@ -35,6 +35,10 @@ let paintEnabled = false;
 // Track if collage has been generated
 let assetsGenerated = false;
 
+// Track the current collage composition (images and layout used)
+let currentCollageLayout = null;
+let currentCollageImages = [];
+
 // Layout patterns with grid positions
 const layoutPatterns = [
     // Pattern 1: One half + two quarters
@@ -213,39 +217,54 @@ function getRandomLayout() {
     return layoutPatterns[Math.floor(Math.random() * layoutPatterns.length)];
 }
 
-function renderCollage() {
+function renderCollage(forceImages = null, forceLayout = null) {
     const container = document.getElementById('collage-container');
     container.innerHTML = '';
 
-    // Get filtered images based on selected tags
-    const filteredImages = filterImagesByTags(selectedTags);
-    
-    if (filteredImages.length === 0) {
-        container.innerHTML = '<p class="no-images">No images match the selected filters</p>';
-        return;
-    }
+    let selectedImagesData;
+    let layout;
+    let positions;
 
-    // Select random number of images between 3 and 6
-    const imageCount = Math.floor(Math.random() * 4) + 3; // 3-6
-    let selectedImagesData = filteredImages
-        .sort(() => 0.5 - Math.random())
-        .slice(0, Math.min(imageCount, filteredImages.length));
-    
-    // Add custom image URL if provided and mix it randomly into the layout
-    if (customImageUrl) {
-        selectedImagesData.push({ path: customImageUrl, tags: ['custom'] });
-        // Shuffle to randomize position
-        for (let i = selectedImagesData.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [selectedImagesData[i], selectedImagesData[j]] = [selectedImagesData[j], selectedImagesData[i]];
+    // If specific images/layout are provided, use those
+    if (forceImages && forceLayout) {
+        selectedImagesData = forceImages;
+        layout = forceLayout;
+        positions = layout.positions.slice(0);
+    } else {
+        // Get filtered images based on selected tags
+        const filteredImages = filterImagesByTags(selectedTags);
+        
+        if (filteredImages.length === 0) {
+            container.innerHTML = '<p class="no-images">No images match the selected filters</p>';
+            return;
         }
+
+        // Select random number of images between 3 and 6
+        const imageCount = Math.floor(Math.random() * 4) + 3; // 3-6
+        selectedImagesData = filteredImages
+            .sort(() => 0.5 - Math.random())
+            .slice(0, Math.min(imageCount, filteredImages.length));
+        
+        // Add custom image URL if provided and mix it randomly into the layout
+        if (customImageUrl) {
+            selectedImagesData.push({ path: customImageUrl, tags: ['custom'] });
+            // Shuffle to randomize position
+            for (let i = selectedImagesData.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [selectedImagesData[i], selectedImagesData[j]] = [selectedImagesData[j], selectedImagesData[i]];
+            }
+        }
+        
+        // Select a random layout pattern
+        layout = getRandomLayout();
+        positions = layout.positions.slice(0);
     }
     
-    // Select a random layout pattern
-    const layout = getRandomLayout();
-    
+    // Store the current composition for later restoration
+    currentCollageLayout = layout;
+    currentCollageImages = selectedImagesData;
+
     // If layout doesn't have enough positions, adjust
-    let positions = layout.positions;
     if (positions.length > selectedImagesData.length) {
         positions = positions.slice(0, selectedImagesData.length);
     } else if (positions.length < selectedImagesData.length) {
@@ -314,6 +333,7 @@ function applyOverlay() {
         overlayElement.style.backgroundSize = 'cover';
         overlayElement.style.opacity = (overlayOpacity / 100);
         overlayElement.style.pointerEvents = 'none';
+        resetHeartButton();
     } else {
         if (overlayElement) {
             overlayElement.remove();
@@ -469,6 +489,15 @@ function applySVGEffects() {
 
 function shuffleLayout() {
     renderCollage();
+    resetHeartButton();
+}
+
+function resetHeartButton() {
+    const heartBtn = document.getElementById('saveHeartBtn');
+    if (heartBtn && heartBtn.classList.contains('filled')) {
+        heartBtn.classList.remove('filled');
+        heartBtn.innerHTML = '<i class="bi bi-heart"></i>';
+    }
 }
 
 function printCollage() {
@@ -498,6 +527,7 @@ function initializeTagFilters() {
                 selectedTags = selectedTags.filter(t => t !== tag);
             }
             renderCollage();
+            resetHeartButton();
         });
         
         label.appendChild(checkbox);
@@ -581,6 +611,7 @@ function initializeSVGEffects() {
                 effectIntensity.blur = parseInt(this.value);
                 valueDisplay.textContent = this.value + 'px';
                 applySVGEffects();
+                resetHeartButton();
             });
             
             sliderContainer.appendChild(sliderLabel);
@@ -602,6 +633,7 @@ function initializeSVGEffects() {
                 sliderContainer.style.display = this.checked ? 'flex' : 'none';
             }
             applySVGEffects();
+            resetHeartButton();
         });
         
         effectsContainer.appendChild(effectWrapper);
@@ -792,8 +824,8 @@ function saveAsJPG() {
     }
 }
 
-document.getElementById('saveBtn').addEventListener('click', saveAsJPG);
-const saveBtn = document.getElementById('saveBtn');
+document.getElementById('downloadJpgBtn').addEventListener('click', saveAsJPG);
+const saveBtn = document.getElementById('downloadJpgBtn');
 
 const tryAgainBtn = document.getElementById('tryAgainBtn');
 tryAgainBtn.addEventListener('click', function() {
@@ -809,6 +841,12 @@ tryAgainBtn.addEventListener('click', function() {
     }
     
     shuffleLayout();
+    
+    // Update URL with new collage layout
+    setTimeout(() => {
+        const settings = getCollageSettings();
+        encodeSettingsToURL(settings);
+    }, 100);
 });
 
 const filterBtn = document.getElementById('filterBtn');
@@ -930,6 +968,7 @@ applyImageBtn.addEventListener('click', function() {
     customImageUrl = imageUrlInput.value.trim();
     imageModal.classList.remove('show');
     renderCollage();
+    resetHeartButton();
 });
 
 clearImageBtn.addEventListener('click', function() {
@@ -937,6 +976,7 @@ clearImageBtn.addEventListener('click', function() {
     imageUrlInput.value = '';
     imageModal.classList.remove('show');
     renderCollage();
+    resetHeartButton();
 });
 
 applyTextBtn.addEventListener('click', function(e) {
@@ -951,23 +991,27 @@ clearTextBtn.addEventListener('click', function() {
     textInput.value = '';
     textModal.classList.remove('show');
     updateTextOverlay();
+    resetHeartButton();
 });
 
 // Font control event listeners
 fontFamily.addEventListener('change', function() {
     textFontFamily = this.value;
     updateTextOverlay();
+    resetHeartButton();
 });
 
 fontSize.addEventListener('change', function() {
     textFontSize = parseInt(this.value) || 24;
     updateTextOverlay();
+    resetHeartButton();
 });
 
 fontColor.addEventListener('change', function() {
     textFontColor = this.value;
     colorValue.textContent = this.value.toUpperCase();
     updateTextOverlay();
+    resetHeartButton();
 });
 
 fontBold.addEventListener('click', function(e) {
@@ -995,24 +1039,28 @@ overlayOpacitySlider.addEventListener('input', function() {
     overlayOpacity = parseInt(this.value);
     opacityValue.textContent = overlayOpacity + '%';
     applyOverlay();
+    resetHeartButton();
 });
 
 paintColorInput.addEventListener('change', function() {
     paintColor = this.value;
     paintColorValue.textContent = this.value.toUpperCase();
     applyPaintOverlay();
+    resetHeartButton();
 });
 
 paintOpacitySlider.addEventListener('input', function() {
     paintOpacity = parseInt(this.value);
     paintOpacityValue.textContent = paintOpacity + '%';
     applyPaintOverlay();
+    resetHeartButton();
 });
 
 paintToggle.addEventListener('change', function() {
     paintEnabled = this.checked;
     renderCollage(); // Re-render to apply/remove grayscale
     applyPaintOverlay();
+    resetHeartButton();
 });
 
 // Close dropdown when clicking outside
@@ -1054,6 +1102,12 @@ document.addEventListener('DOMContentLoaded', function() {
         renderCollage();
         assetsGenerated = true;
         setToolbarButtonsEnabled(true);
+        
+        // Update URL with current collage settings
+        setTimeout(() => {
+            const settings = getCollageSettings();
+            encodeSettingsToURL(settings);
+        }, 100);
     });
     
     // Disable toolbar buttons on page load
@@ -1081,6 +1135,7 @@ function initializeOverlays() {
         radio.addEventListener('change', function() {
             selectedOverlay = this.value;
             applyOverlay();
+            resetHeartButton();
         });
         
         label.appendChild(radio);
@@ -1149,3 +1204,587 @@ function initializeTextInteractions() {
             }
         });
 }
+// ============================================================
+// URL Parameters & Settings Management
+// ============================================================
+
+function getCollageSettings() {
+    return {
+        selectedTags: selectedTags,
+        selectedEffects: selectedEffects,
+        effectIntensity: effectIntensity,
+        customImageUrl: customImageUrl,
+        textOverlayContent: textOverlayContent,
+        textFontFamily: textFontFamily,
+        textFontSize: textFontSize,
+        textFontColor: textFontColor,
+        textFontBold: textFontBold,
+        textFontItalic: textFontItalic,
+        textFontUnderline: textFontUnderline,
+        selectedOverlay: selectedOverlay,
+        overlayOpacity: overlayOpacity,
+        paintColor: paintColor,
+        paintOpacity: paintOpacity,
+        paintEnabled: paintEnabled,
+        textX: document.getElementById('text-overlay').style.left || '50%',
+        textY: document.getElementById('text-overlay').style.top || '50%',
+        // Store the actual collage composition
+        collageImages: currentCollageImages,
+        collageLayout: currentCollageLayout
+    };
+}
+
+function restoreCollageSettings(settings) {
+    if (!settings) return;
+    
+    selectedTags = settings.selectedTags || [];
+    selectedEffects = settings.selectedEffects || [];
+    effectIntensity = settings.effectIntensity || { blur: 3 };
+    customImageUrl = settings.customImageUrl || '';
+    textOverlayContent = settings.textOverlayContent || '';
+    textFontFamily = settings.textFontFamily || 'Arial, sans-serif';
+    textFontSize = settings.textFontSize || 24;
+    textFontColor = settings.textFontColor || '#212529';
+    textFontBold = settings.textFontBold || false;
+    textFontItalic = settings.textFontItalic || false;
+    textFontUnderline = settings.textFontUnderline || false;
+    selectedOverlay = settings.selectedOverlay || '';
+    overlayOpacity = settings.overlayOpacity || 100;
+    paintColor = settings.paintColor || '#FFFF00';
+    paintOpacity = settings.paintOpacity || 50;
+    paintEnabled = settings.paintEnabled || false;
+    
+    // Restore the collage composition if available
+    currentCollageImages = settings.collageImages || [];
+    currentCollageLayout = settings.collageLayout || null;
+    
+    // Update UI elements
+    updateUIFromSettings();
+    
+    // Render with specific images/layout if available, otherwise random
+    if (currentCollageImages.length > 0 && currentCollageLayout) {
+        renderCollage(currentCollageImages, currentCollageLayout);
+    } else {
+        renderCollage();
+    }
+    
+    updateTextOverlay();
+    applyPaintOverlay();
+    
+    // Fill the heart if this was a previously saved collage
+    const heartBtn = document.getElementById('saveHeartBtn');
+    if (heartBtn && settings.isSavedCollage) {
+        heartBtn.classList.add('filled');
+        heartBtn.innerHTML = '<i class="bi bi-heart-fill"></i>';
+    }
+}
+
+function updateUIFromSettings() {
+    // Update tag checkboxes
+    document.querySelectorAll('.tag-filter-checkbox').forEach(checkbox => {
+        checkbox.checked = selectedTags.includes(checkbox.value);
+    });
+    
+    // Update effect checkboxes and slider
+    document.querySelectorAll('.effect-checkbox').forEach(checkbox => {
+        checkbox.checked = selectedEffects.includes(checkbox.value);
+    });
+    
+    const blurSlider = document.getElementById('blurSlider');
+    if (blurSlider) {
+        blurSlider.value = effectIntensity.blur;
+    }
+    const blurValue = document.getElementById('blurValue');
+    if (blurValue) {
+        blurValue.textContent = effectIntensity.blur;
+    }
+    
+    // Update image URL
+    const imageUrlInput = document.getElementById('imageUrlInput');
+    if (imageUrlInput) {
+        imageUrlInput.value = customImageUrl;
+    }
+    
+    // Update text settings
+    const textInput = document.getElementById('textInput');
+    if (textInput) {
+        textInput.value = textOverlayContent;
+    }
+    const fontFamily = document.getElementById('fontFamily');
+    if (fontFamily) {
+        fontFamily.value = textFontFamily;
+    }
+    const fontSize = document.getElementById('fontSize');
+    if (fontSize) {
+        fontSize.value = textFontSize;
+    }
+    const fontColor = document.getElementById('fontColor');
+    if (fontColor) {
+        fontColor.value = textFontColor;
+    }
+    const colorValue = document.getElementById('colorValue');
+    if (colorValue) {
+        colorValue.textContent = textFontColor;
+    }
+    const fontBold = document.getElementById('fontBold');
+    if (fontBold) {
+        fontBold.classList.toggle('active', textFontBold);
+    }
+    const fontItalic = document.getElementById('fontItalic');
+    if (fontItalic) {
+        fontItalic.classList.toggle('active', textFontItalic);
+    }
+    
+    // Update overlay settings
+    const overlayOpacityInput = document.getElementById('overlayOpacity');
+    if (overlayOpacityInput) {
+        overlayOpacityInput.value = overlayOpacity;
+    }
+    const opacityValueEl = document.getElementById('opacityValue');
+    if (opacityValueEl) {
+        opacityValueEl.textContent = overlayOpacity + '%';
+    }
+    
+    // Update paint settings
+    const paintColorEl = document.getElementById('paintColor');
+    if (paintColorEl) {
+        paintColorEl.value = paintColor;
+    }
+    const paintColorValue = document.getElementById('paintColorValue');
+    if (paintColorValue) {
+        paintColorValue.textContent = paintColor;
+    }
+    const paintOpacityEl = document.getElementById('paintOpacity');
+    if (paintOpacityEl) {
+        paintOpacityEl.value = paintOpacity;
+    }
+    const paintOpacityValue = document.getElementById('paintOpacityValue');
+    if (paintOpacityValue) {
+        paintOpacityValue.textContent = paintOpacity + '%';
+    }
+    const paintToggle = document.getElementById('paintToggle');
+    if (paintToggle) {
+        paintToggle.checked = paintEnabled;
+    }
+}
+
+function encodeSettingsToURL(settings) {
+    const params = new URLSearchParams();
+    
+    // Compress and encode the full collage data into the URL
+    try {
+        const collageData = {
+            images: settings.collageImages,
+            layout: settings.collageLayout,
+            tags: settings.selectedTags,
+            effects: settings.selectedEffects,
+            blur: settings.effectIntensity.blur,
+            text: settings.textOverlayContent,
+            fontFamily: settings.textFontFamily,
+            fontSize: settings.textFontSize,
+            fontColor: settings.textFontColor,
+            fontBold: settings.textFontBold,
+            fontItalic: settings.textFontItalic,
+            overlay: settings.selectedOverlay,
+            overlayOpacity: settings.overlayOpacity,
+            paintColor: settings.paintColor,
+            paintOpacity: settings.paintOpacity,
+            paintEnabled: settings.paintEnabled,
+            customImage: settings.customImageUrl
+        };
+        
+        // Convert to JSON, then to base64 for URL safety
+        const jsonString = JSON.stringify(collageData);
+        const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+        params.set('collage', encoded);
+        
+        const queryString = params.toString();
+        if (queryString) {
+            window.history.replaceState(null, '', '?' + queryString);
+        }
+    } catch (e) {
+        console.error('Error encoding collage to URL:', e);
+    }
+}
+
+function decodeSettingsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const settings = {};
+    
+    // Check if there's a collage parameter with base64 encoded data
+    if (params.has('collage')) {
+        try {
+            const encoded = params.get('collage');
+            if (!encoded) {
+                console.warn('Collage parameter is empty');
+                return null;
+            }
+            
+            // Decode base64
+            let jsonString;
+            try {
+                jsonString = decodeURIComponent(escape(atob(encoded)));
+            } catch (e) {
+                // Try alternative decoding method
+                console.warn('Standard decode failed, trying alternative method');
+                jsonString = atob(encoded);
+            }
+            
+            const collageData = JSON.parse(jsonString);
+            
+            // Validate that we have the expected data
+            if (!collageData.images || !Array.isArray(collageData.images)) {
+                console.warn('Invalid collage data: missing images');
+                return null;
+            }
+            
+            // Restore all settings from the decoded data
+            settings.selectedTags = collageData.tags || [];
+            settings.selectedEffects = collageData.effects || [];
+            settings.effectIntensity = { blur: collageData.blur || 3 };
+            settings.customImageUrl = collageData.customImage || '';
+            settings.textOverlayContent = collageData.text || '';
+            settings.textFontFamily = collageData.fontFamily || 'Arial, sans-serif';
+            settings.textFontSize = collageData.fontSize || 24;
+            settings.textFontColor = collageData.fontColor || '#212529';
+            settings.textFontBold = collageData.fontBold || false;
+            settings.textFontItalic = collageData.fontItalic || false;
+            settings.selectedOverlay = collageData.overlay || '';
+            settings.overlayOpacity = collageData.overlayOpacity || 100;
+            settings.paintColor = collageData.paintColor || '#FFFF00';
+            settings.paintOpacity = collageData.paintOpacity || 50;
+            settings.paintEnabled = collageData.paintEnabled || false;
+            settings.collageImages = collageData.images;
+            settings.collageLayout = collageData.layout;
+            
+            console.log('Successfully decoded collage from URL with', collageData.images.length, 'images');
+            return settings;
+        } catch (e) {
+            console.error('Error decoding collage from URL:', e);
+            console.error('Encoded string length:', params.get('collage').length);
+            return null;
+        }
+    }
+    
+    // If no collage parameter, try to decode from legacy URL parameters
+    if (params.has('tags')) {
+        settings.selectedTags = params.get('tags').split(',');
+    }
+    if (params.has('effects')) {
+        settings.selectedEffects = params.get('effects').split(',');
+    }
+    if (params.has('blur')) {
+        if (!settings.effectIntensity) settings.effectIntensity = {};
+        settings.effectIntensity.blur = parseInt(params.get('blur'));
+    }
+    if (params.has('image')) {
+        settings.customImageUrl = decodeURIComponent(params.get('image'));
+    }
+    if (params.has('text')) {
+        settings.textOverlayContent = decodeURIComponent(params.get('text'));
+        settings.textFontFamily = params.get('fontFamily') || 'Arial, sans-serif';
+        settings.textFontSize = parseInt(params.get('fontSize')) || 24;
+        settings.textFontColor = '#' + (params.get('fontColor') || '212529');
+        settings.textFontBold = params.has('bold');
+        settings.textFontItalic = params.has('italic');
+    }
+    if (params.has('overlay')) {
+        settings.selectedOverlay = decodeURIComponent(params.get('overlay'));
+        settings.overlayOpacity = parseInt(params.get('overlayOpacity')) || 100;
+    }
+    if (params.has('paint')) {
+        settings.paintEnabled = true;
+        settings.paintColor = '#' + (params.get('paintColor') || 'FFFF00');
+        settings.paintOpacity = parseInt(params.get('paintOpacity')) || 50;
+    }
+    
+    return Object.keys(settings).length > 0 ? settings : null;
+}
+
+// ============================================================
+// Local Storage Management
+// ============================================================
+
+function getSavedCollages() {
+    const saved = localStorage.getItem('collage-saves');
+    return saved ? JSON.parse(saved) : [];
+}
+
+function saveCollageToStorage(name, settings) {
+    const collages = getSavedCollages();
+    collages.push({
+        id: Date.now(),
+        name: name,
+        timestamp: new Date().toLocaleString(),
+        settings: settings
+    });
+    localStorage.setItem('collage-saves', JSON.stringify(collages));
+    return collages[collages.length - 1].id;
+}
+
+function deleteCollageFromStorage(id) {
+    let collages = getSavedCollages();
+    collages = collages.filter(c => c.id !== id);
+    localStorage.setItem('collage-saves', JSON.stringify(collages));
+}
+
+function loadCollageFromStorage(id) {
+    const collages = getSavedCollages();
+    return collages.find(c => c.id === id);
+}
+
+function renderSavesList() {
+    const list = document.getElementById('saves-list');
+    const collages = getSavedCollages();
+    
+    if (collages.length === 0) {
+        list.innerHTML = '<p style="color: #6c757d; font-size: 0.875rem; margin: 0;">No saved collages</p>';
+        return;
+    }
+    
+    list.innerHTML = collages.map(collage => `
+        <div class="save-item">
+            <div class="save-item-name" title="${collage.name}" data-id="${collage.id}" style="cursor: pointer;">
+                <strong>${collage.name}</strong>
+                <div style="font-size: 0.75rem; color: #6c757d;">${collage.timestamp}</div>
+            </div>
+            <button class="save-item-delete" data-id="${collage.id}" title="Delete">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    // Add event listeners
+    list.querySelectorAll('.save-item-name').forEach(item => {
+        item.addEventListener('click', () => {
+            const collage = loadCollageFromStorage(parseInt(item.dataset.id));
+            if (collage) {
+                const settings = collage.settings;
+                settings.isSavedCollage = true;
+                restoreCollageSettings(settings);
+                encodeSettingsToURL(settings);
+                
+                // Hide generate overlay and mark as generated
+                const generateOverlay = document.getElementById('generate-overlay');
+                const collageContainer = document.getElementById('collage-container');
+                if (generateOverlay && !generateOverlay.classList.contains('hidden')) {
+                    generateOverlay.classList.add('hidden');
+                    collageContainer.classList.add('active');
+                    assetsGenerated = true;
+                    setToolbarButtonsEnabled(true);
+                }
+                
+                // Close the saves panel
+                document.getElementById('saves-panel').classList.remove('show');
+            }
+        });
+    });
+    
+    list.querySelectorAll('.save-item-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('Delete this collage?')) {
+                deleteCollageFromStorage(parseInt(btn.dataset.id));
+                renderSavesList();
+            }
+        });
+    });
+}
+
+function exportSavesToJSON() {
+    const collages = getSavedCollages();
+    const dataStr = JSON.stringify(collages, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'collage-saves_' + new Date().getTime() + '.json';
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+function importSavesFromJSON(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const imported = JSON.parse(e.target.result);
+            const existing = getSavedCollages();
+            
+            // Merge with existing saves, avoiding duplicates by ID
+            const merged = [...existing];
+            imported.forEach(item => {
+                if (!merged.find(m => m.id === item.id)) {
+                    merged.push(item);
+                }
+            });
+            
+            localStorage.setItem('collage-saves', JSON.stringify(merged));
+            renderSavesList();
+            alert('Saves imported successfully!');
+        } catch (err) {
+            alert('Error importing saves: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// ============================================================
+// UI Event Listeners
+// ============================================================
+
+document.getElementById('savesBtn').addEventListener('click', () => {
+    const panel = document.getElementById('saves-panel');
+    const isShowing = panel.classList.contains('show');
+    
+    document.querySelectorAll('.dropdown-menu, .image-modal, .text-modal, .overlay-panel, .paint-panel').forEach(el => {
+        el.classList.remove('show');
+    });
+    
+    if (!isShowing) {
+        panel.classList.add('show');
+        renderSavesList();
+    } else {
+        panel.classList.remove('show');
+    }
+});
+
+// Show save modal when clicking heart button
+document.getElementById('saveHeartBtn').addEventListener('click', () => {
+    document.getElementById('collageNameInput').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('save-modal'));
+    modal.show();
+});
+
+// Share button functionality
+document.getElementById('shareBtn').addEventListener('click', async () => {
+    const settings = getCollageSettings();
+    
+    // Build the collage data and encode it
+    const collageData = {
+        images: settings.collageImages,
+        layout: settings.collageLayout,
+        tags: settings.selectedTags,
+        effects: settings.selectedEffects,
+        blur: settings.effectIntensity.blur,
+        text: settings.textOverlayContent,
+        fontFamily: settings.textFontFamily,
+        fontSize: settings.textFontSize,
+        fontColor: settings.textFontColor,
+        fontBold: settings.textFontBold,
+        fontItalic: settings.textFontItalic,
+        overlay: settings.selectedOverlay,
+        overlayOpacity: settings.overlayOpacity,
+        paintColor: settings.paintColor,
+        paintOpacity: settings.paintOpacity,
+        paintEnabled: settings.paintEnabled,
+        customImage: settings.customImageUrl
+    };
+    
+    const jsonString = JSON.stringify(collageData);
+    const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+    const shareUrl = window.location.origin + window.location.pathname + '?collage=' + encoded;
+    
+    // Check if Web Share API is available (mobile)
+    if (navigator.share && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        try {
+            await navigator.share({
+                title: 'Collage Asset Generator',
+                text: 'Check out this collage I created!',
+                url: shareUrl
+            });
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('Share failed:', err);
+            }
+        }
+    } else {
+        // Desktop: Copy to clipboard
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            alert('URL has been copied to clipboard');
+        } catch (err) {
+            console.error('Failed to copy to clipboard:', err);
+            alert('Failed to copy URL to clipboard');
+        }
+    }
+});
+
+// Also allow Ctrl+S to save
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        document.getElementById('collageNameInput').value = '';
+        const modal = new bootstrap.Modal(document.getElementById('save-modal'));
+        modal.show();
+    }
+});
+
+document.getElementById('confirmSaveBtn').addEventListener('click', () => {
+    const name = document.getElementById('collageNameInput').value.trim();
+    if (!name) {
+        alert('Please enter a name for the collage');
+        return;
+    }
+    
+    const settings = getCollageSettings();
+    saveCollageToStorage(name, settings);
+    
+    // Close modal and reset
+    bootstrap.Modal.getInstance(document.getElementById('save-modal')).hide();
+    document.getElementById('collageNameInput').value = '';
+    renderSavesList();
+    
+    // Fill the heart
+    const heartBtn = document.getElementById('saveHeartBtn');
+    heartBtn.classList.add('filled');
+    heartBtn.innerHTML = '<i class="bi bi-heart-fill"></i>';
+    
+    alert('Collage saved successfully!');
+});
+
+document.getElementById('exportSavesBtn').addEventListener('click', exportSavesToJSON);
+
+document.getElementById('importSavesBtn').addEventListener('click', () => {
+    document.getElementById('importsavesFile').click();
+});
+
+document.getElementById('importsavesFile').addEventListener('change', (e) => {
+    if (e.target.files[0]) {
+        importSavesFromJSON(e.target.files[0]);
+        e.target.value = '';
+    }
+});
+
+// Update URL parameters when settings change
+function setupURLUpdateListeners() {
+    // This will be called after each significant change
+    // For now, we'll update on these key events
+    document.getElementById('generateBtn').addEventListener('click', () => {
+        setTimeout(() => {
+            const settings = getCollageSettings();
+            encodeSettingsToURL(settings);
+        }, 100);
+    });
+}
+
+// Parse URL on page load
+window.addEventListener('load', () => {
+    const urlSettings = decodeSettingsFromURL();
+    if (urlSettings && urlSettings.collageImages && urlSettings.collageImages.length > 0) {
+        console.log('Loading collage from URL with', urlSettings.collageImages.length, 'images');
+        restoreCollageSettings(urlSettings);
+        
+        // Mark as generated and show the collage immediately
+        const generateOverlay = document.getElementById('generate-overlay');
+        const collageContainer = document.getElementById('collage-container');
+        if (generateOverlay) {
+            generateOverlay.classList.add('hidden');
+        }
+        if (collageContainer) {
+            collageContainer.classList.add('active');
+        }
+        assetsGenerated = true;
+        setToolbarButtonsEnabled(true);
+    }
+    setupURLUpdateListeners();
+});
