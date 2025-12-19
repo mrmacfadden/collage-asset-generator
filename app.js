@@ -350,6 +350,9 @@ function renderCollage(forceImages = null, forceLayout = null) {
         item.className = `collage-item col-span-${pos.colspan} row-span-${pos.rowspan}`;
         item.innerHTML = `
             <img src="${imageData.path}" alt="Collage image ${index + 1}" loading="lazy">
+            <button class="replace-icon" title="Replace this image" data-index="${index}">
+                <i class="bi bi-arrow-repeat"></i>
+            </button>
         `;
         // Apply SVG filters to the image
         const img = item.querySelector('img');
@@ -371,11 +374,83 @@ function renderCollage(forceImages = null, forceLayout = null) {
         if (filterParts.length > 0) {
             img.style.filter = filterParts.join(' ');
         }
+        
+        // Add click handler to replace button
+        const replaceBtn = item.querySelector('.replace-icon');
+        replaceBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            replaceImageAtIndex(index);
+        });
+        
         container.appendChild(item);
     });
     
     // Apply overlay if selected
     applyOverlay();
+}
+
+function replaceImageAtIndex(index) {
+    const filteredImages = filterImagesByTags(selectedTags);
+    
+    if (filteredImages.length === 0) {
+        alert('No images available to replace with');
+        return;
+    }
+    
+    // Get list of images already in the collage (excluding custom images)
+    const usedPaths = currentCollageImages
+        .filter(img => !img.tags || !img.tags.includes('custom'))
+        .map(img => img.path);
+    
+    // Find available images not currently in the collage
+    const availableImages = filteredImages.filter(img => !usedPaths.includes(img.path));
+    
+    // If no unique images available, allow repeats
+    const imagesToChooseFrom = availableImages.length > 0 ? availableImages : filteredImages;
+    
+    // Select a random image
+    const randomImage = imagesToChooseFrom[Math.floor(Math.random() * imagesToChooseFrom.length)];
+    
+    // Replace the image at the specified index
+    currentCollageImages[index] = randomImage;
+    
+    // Update just the image in the DOM without re-rendering everything
+    const container = document.getElementById('collage-container');
+    const collageItems = container.querySelectorAll('.collage-item');
+    const targetItem = collageItems[index];
+    
+    if (targetItem) {
+        const img = targetItem.querySelector('img');
+        if (img) {
+            img.src = randomImage.path;
+            
+            // Re-apply filters to the updated image
+            let filterParts = [];
+            selectedEffects.forEach(effect => {
+                if (effect === 'blur') {
+                    const blurAmount = effectIntensity.blur;
+                    filterParts.push(`blur(${blurAmount}px)`);
+                } else {
+                    filterParts.push(`url(#svg-${effect})`);
+                }
+            });
+            
+            if (paintEnabled && paintOpacity > 0) {
+                filterParts.push('grayscale(100%)');
+            }
+            
+            if (filterParts.length > 0) {
+                img.style.filter = filterParts.join(' ');
+            } else {
+                img.style.filter = '';
+            }
+        }
+    }
+    
+    // Update URL and heart button
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
+    resetHeartButton();
 }
 
 function applyOverlay() {
