@@ -1221,11 +1221,11 @@ paintOpacitySlider.addEventListener('input', function() {
 
 paintToggle.addEventListener('change', function() {
     paintEnabled = this.checked;
-    renderCollage(); // Re-render to apply/remove grayscale
+    renderCollage(currentCollageImages, currentCollageLayout);
+    applyPaintOverlay();
     updateTextZIndexButtonStates();
     const settings = getCollageSettings();
     encodeSettingsToURL(settings);
-    applyPaintOverlay();
     resetHeartButton();
 });
 
