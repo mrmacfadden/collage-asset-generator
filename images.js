@@ -1,12 +1,12 @@
 // Array of all images in the img folder with tags for filtering
 const images = [
-    { id: 0, path: 'img/advertisement.jpg', tags: ['tag1', 'tag2', 'advertisement'] },
-    { id: 1, path: 'img/crane-2.jpg', tags: ['tag1', 'tag3', 'bird'] },
-    { id: 2, path: 'img/crane.jpg', tags: ['tag2', 'tag3', 'bird'] },
-    { id: 3, path: 'img/heron.png', tags: ['tag1', 'tag2', 'bird'] },
-    { id: 4, path: 'img/soda-ad.jpg', tags: ['tag2', 'tag3', 'advertisement'] },
-    { id: 5, path: 'img/vintage-cat-poster.png', tags: ['tag1', 'tag3', 'advertisement'] },
-    { id: 6, path: 'img/vintage-model-1.png', tags: ['tag1', 'tag2', 'tag3'] }
+    { id: 0, path: 'img/advertisement.jpg', tags: ['tag1', 'tag2', 'advertisement'], attribution: 'John Smith', link: 'pixabay.com' },
+    { id: 1, path: 'img/crane-2.jpg', tags: ['tag1', 'tag3', 'bird'], attribution: 'John Smith', link: 'pixabay.com' },
+    { id: 2, path: 'img/crane.jpg', tags: ['tag2', 'tag3', 'bird'], attribution: 'John Smith', link: 'pixabay.com' },
+    { id: 3, path: 'img/heron.png', tags: ['tag1', 'tag2', 'bird'], attribution: 'John Smith', link: 'pixabay.com' },
+    { id: 4, path: 'img/soda-ad.jpg', tags: ['tag2', 'tag3', 'advertisement'], attribution: 'John Smith', link: 'pixabay.com' },
+    { id: 5, path: 'img/vintage-cat-poster.png', tags: ['tag1', 'tag3', 'advertisement'], attribution: 'John Smith', link: 'pixabay.com' },
+    { id: 6, path: 'img/vintage-model-1.png', tags: ['tag1', 'tag2', 'tag3'], attribution: 'John Smith', link: 'pixabay.com' }
 ];
 
 // Get all unique tags

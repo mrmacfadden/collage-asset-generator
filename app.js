@@ -2123,6 +2123,41 @@ document.getElementById('shareBtn').addEventListener('click', async () => {
     }
 });
 
+// Info button functionality - display image information
+document.getElementById('infoBtn').addEventListener('click', () => {
+    if (!currentCollageImages || currentCollageImages.length === 0) {
+        showAlert('No images in collage to display info', 'info');
+        return;
+    }
+    
+    // Build the image info content
+    let infoHtml = '<table class="table table-sm"><thead><tr><th>Filename</th><th>Attribution</th><th>Source</th></tr></thead><tbody>';
+    
+    currentCollageImages.forEach(img => {
+        const fileName = img.path.split('/').pop() || 'Unknown';
+        const attribution = img.attribution || 'NA';
+        const link = img.link || 'NA';
+        
+        // Make links clickable if not "NA"
+        let linkDisplay;
+        if (link !== 'NA') {
+            // Add protocol if missing
+            const url = link.startsWith('http') ? link : 'https://' + link;
+            linkDisplay = `<a href="${url}" target="_blank" rel="noopener noreferrer">${link}</a>`;
+        } else {
+            linkDisplay = 'NA';
+        }
+        
+        infoHtml += `<tr><td>${fileName}</td><td>${attribution}</td><td>${linkDisplay}</td></tr>`;
+    });
+    
+    infoHtml += '</tbody></table>';
+    document.getElementById('imageInfoContent').innerHTML = infoHtml;
+    
+    const modal = new bootstrap.Modal(document.getElementById('imageInfoModal'));
+    modal.show();
+});
+
 // Also allow Ctrl+S to save
 document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.key === 's') {
