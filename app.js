@@ -2364,12 +2364,12 @@ document.getElementById('infoBtn').addEventListener('click', () => {
         if (link !== 'NA') {
             // Add protocol if missing
             const url = link.startsWith('http') ? link : 'https://' + link;
-            linkDisplay = `<a href="${url}" target="_blank" rel="noopener noreferrer">${link}</a>`;
+            linkDisplay = `<a href="${url}" target="_blank" rel="noopener noreferrer" class="truncate-link" title="${link}">${link}</a>`;
         } else {
             linkDisplay = 'NA';
         }
         
-        infoHtml += `<tr><td>${fileName}</td><td>${attribution}</td><td>${linkDisplay}</td></tr>`;
+        infoHtml += `<tr><td>${fileName}</td><td><div class="truncate-link" title="${attribution}">${attribution}</div></td><td>${linkDisplay}</td></tr>`;
     });
     
     infoHtml += '</tbody></table>';

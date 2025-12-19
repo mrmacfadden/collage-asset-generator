@@ -214,6 +214,10 @@ header h1:hover {
     background-color: #495057;
 }
 
+.tag-filter-checkbox {
+    margin-right: 0.5rem;
+}
+
 .blend-mode-label {
     display: flex;
     align-items: center;
@@ -772,7 +776,9 @@ header h1:hover {
     }
     
     #saveHeartBtn,
-    #shareBtn {
+    #shareBtn,
+    #infoBtn,
+    .no-print {
         display: none !important;
     }
 }
@@ -1258,4 +1264,31 @@ header h1:hover {
 .btn-primary:focus {
     background-color: #7e22ce !important;
     border-color: #7e22ce !important;
+}
+
+#imageInfoModal .modal-body table {
+    table-layout: fixed;
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+#imageInfoModal .modal-body table thead {
+    font-size: 0.8rem;
+}
+
+#imageInfoModal .modal-body table td {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    padding: 0.4rem !important;
+}
+
+#imageInfoModal .modal-body table td:last-child {
+    max-width: 150px;
+}
+
+.truncate-link {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
