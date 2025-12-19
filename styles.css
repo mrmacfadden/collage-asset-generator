@@ -561,6 +561,28 @@ header h1:hover {
     background-color: rgba(168, 85, 247, 0.1);
 }
 
+.layout-star-btn {
+    background-color: transparent;
+    border: none;
+    padding: 0.25rem 0.5rem !important;
+    color: #6c757d;
+    transition: all 0.2s ease;
+}
+
+.layout-star-btn:hover {
+    background-color: rgba(168, 85, 247, 0.1);
+    transform: scale(1.2);
+}
+
+.layout-star {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.layout-star.bi-star-fill {
+    color: #FFD700;
+}
+
 .overlay-item:hover {
     border-color: #a855f7;
     background-color: #353535;

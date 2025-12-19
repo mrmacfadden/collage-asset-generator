@@ -105,31 +105,28 @@ let selectedLayout = null;
 // Track images for the currently selected layout
 let layoutSelectedImages = null;
 
+// Track the image count for the currently selected layout
+let layoutImageCount = null;
+
+// Track favorite layouts
+let favoriteLayouts = [];
+
 // Flag to prevent re-rendering when loading from URL
 let loadingFromURL = false;
 
 // Layout patterns with grid positions
 const layoutPatterns = [
-    // Pattern 1: One half + two quarters
+    // Pattern 1: One tall on left + three stacked on right
     {
         name: 'half-and-quarters',
         positions: [
-            { colspan: 2, rowspan: 2 },
-            { colspan: 1, rowspan: 1 },
-            { colspan: 1, rowspan: 1 }
-        ]
-    },
-    // Pattern 2: One half + three sixths
-    {
-        name: 'half-and-thirds',
-        positions: [
-            { colspan: 2, rowspan: 2 },
+            { colspan: 1, rowspan: 3 },
             { colspan: 1, rowspan: 1 },
             { colspan: 1, rowspan: 1 },
             { colspan: 1, rowspan: 1 }
         ]
     },
-    // Pattern 3: Two halves top, two quarters bottom
+    // Pattern 2: Two halves top, two quarters bottom
     {
         name: 'balanced-split',
         positions: [
@@ -253,12 +250,13 @@ const layoutPatterns = [
             { colspan: 1, rowspan: 1 }
         ]
     },
-    // Pattern 15: Checkerboard asymmetric
+    // Pattern 15: Checkerboard - 6 equal images (2x3)
     {
         name: 'checkerboard',
         positions: [
             { colspan: 1, rowspan: 1 },
-            { colspan: 1, rowspan: 2 },
+            { colspan: 1, rowspan: 1 },
+            { colspan: 1, rowspan: 1 },
             { colspan: 1, rowspan: 1 },
             { colspan: 1, rowspan: 1 },
             { colspan: 1, rowspan: 1 }
@@ -276,6 +274,50 @@ function setToolbarButtonsEnabled(enabled) {
     textBtn.disabled = !enabled;
     printBtn.disabled = !enabled;
     saveBtn.disabled = !enabled;
+}
+
+function saveFavoriteLayouts() {
+    localStorage.setItem('favorite-layouts', JSON.stringify(favoriteLayouts));
+}
+
+function loadFavoriteLayouts() {
+    const saved = localStorage.getItem('favorite-layouts');
+    if (saved) {
+        try {
+            favoriteLayouts = JSON.parse(saved);
+        } catch (e) {
+            console.error('Error loading favorite layouts:', e);
+            favoriteLayouts = [];
+        }
+    }
+}
+
+function toggleLayoutFavorite(layoutName, e) {
+    e.stopPropagation();
+    
+    if (favoriteLayouts.includes(layoutName)) {
+        favoriteLayouts = favoriteLayouts.filter(name => name !== layoutName);
+    } else {
+        favoriteLayouts.push(layoutName);
+    }
+    
+    saveFavoriteLayouts();
+    updateLayoutStarButtons();
+}
+
+function updateLayoutStarButtons() {
+    document.querySelectorAll('.layout-star').forEach(star => {
+        const layoutName = star.dataset.layoutName;
+        if (favoriteLayouts.includes(layoutName)) {
+            star.classList.remove('bi-star');
+            star.classList.add('bi-star-fill');
+            star.style.color = '#FFD700';
+        } else {
+            star.classList.remove('bi-star-fill');
+            star.classList.add('bi-star');
+            star.style.color = '#6c757d';
+        }
+    });
 }
 
 function getRandomImages(count) {
@@ -320,7 +362,7 @@ function renderCollage(forceImages = null, forceLayout = null) {
             } else {
                 // First time selecting this layout - pick images
                 const requiredImageCount = layout.positions.length;
-                const imageCount = Math.max(requiredImageCount, Math.floor(Math.random() * 4) + 3);
+                const imageCount = layoutImageCount || Math.max(requiredImageCount, Math.floor(Math.random() * 4) + 3);
                 selectedImagesData = filteredImages
                     .sort(() => 0.5 - Math.random())
                     .slice(0, Math.min(imageCount, filteredImages.length));
@@ -329,13 +371,15 @@ function renderCollage(forceImages = null, forceLayout = null) {
                     selectedImagesData.push({ path: customImageUrl, tags: ['custom'] });
                 }
                 
-                // Store these images for this layout
+                // Store these images and count for this layout
                 layoutSelectedImages = selectedImagesData;
+                layoutImageCount = imageCount;
             }
         } else {
             // No layout selected - random behavior
             layout = getRandomLayout();
             layoutSelectedImages = null; // Clear stored images
+            layoutImageCount = null; // Clear stored image count
             
             const requiredImageCount = layout.positions.length;
             const imageCount = Math.max(requiredImageCount, Math.floor(Math.random() * 4) + 3);
@@ -688,9 +732,16 @@ function initializeLayoutOptions() {
     layoutContainer.innerHTML = ''; // Clear existing layouts
     
     layoutPatterns.forEach((layout, index) => {
+        const layoutWrapper = document.createElement('div');
+        layoutWrapper.className = 'layout-option-wrapper';
+        layoutWrapper.style.display = 'flex';
+        layoutWrapper.style.gap = '0.5rem';
+        layoutWrapper.style.alignItems = 'center';
+        layoutWrapper.style.marginBottom = '0.5rem';
+        
         const layoutButton = document.createElement('button');
-        layoutButton.className = 'layout-option btn btn-sm btn-outline-secondary mb-2';
-        layoutButton.style.width = '100%';
+        layoutButton.className = 'layout-option btn btn-sm btn-outline-secondary';
+        layoutButton.style.flex = '1';
         layoutButton.textContent = layout.name.replace(/-/g, ' ').charAt(0).toUpperCase() + layout.name.replace(/-/g, ' ').slice(1);
         layoutButton.dataset.layoutIndex = index;
         
@@ -706,6 +757,7 @@ function initializeLayoutOptions() {
             // Preserve current images when selecting a layout
             if (currentCollageImages && currentCollageImages.length > 0) {
                 layoutSelectedImages = currentCollageImages;
+                layoutImageCount = currentCollageImages.length;
             }
             
             // Update all layout buttons
@@ -727,7 +779,25 @@ function initializeLayoutOptions() {
             }, 100);
         });
         
-        layoutContainer.appendChild(layoutButton);
+        // Create star button for favorites
+        const starButton = document.createElement('button');
+        starButton.className = 'layout-star-btn btn btn-sm';
+        starButton.style.padding = '0.25rem 0.5rem';
+        starButton.title = 'Add to favorites';
+        starButton.dataset.layoutName = layout.name;
+        
+        const starIcon = document.createElement('i');
+        starIcon.className = favoriteLayouts.includes(layout.name) ? 'bi bi-star-fill layout-star' : 'bi bi-star layout-star';
+        starIcon.dataset.layoutName = layout.name;
+        starIcon.style.cursor = 'pointer';
+        starIcon.style.color = favoriteLayouts.includes(layout.name) ? '#FFD700' : '#6c757d';
+        
+        starButton.appendChild(starIcon);
+        starButton.addEventListener('click', (e) => toggleLayoutFavorite(layout.name, e));
+        
+        layoutWrapper.appendChild(layoutButton);
+        layoutWrapper.appendChild(starButton);
+        layoutContainer.appendChild(layoutWrapper);
     });
 }
 
@@ -1265,6 +1335,7 @@ clearImageBtn.addEventListener('click', function() {
 clearLayoutBtn.addEventListener('click', function() {
     selectedLayout = null;
     layoutSelectedImages = null;
+    layoutImageCount = null;
     // Reset all layout buttons to outline style
     document.querySelectorAll('.layout-option').forEach(btn => {
         btn.classList.remove('btn-primary');
@@ -1476,6 +1547,7 @@ document.addEventListener('click', function(e) {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    loadFavoriteLayouts();
     initializeTagFilters();
     initializeLayoutOptions();
     initializeSVGEffects();
