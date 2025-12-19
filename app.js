@@ -66,7 +66,8 @@ let selectedEffects = [];
 
 // Track effect intensities
 let effectIntensity = {
-    blur: 3
+    blur: 3,
+    glitch: 10
 };
 
 // Track custom image URL
@@ -694,7 +695,8 @@ function initializeSVGEffects() {
         { name: 'Vintage', value: 'vintage', hasSlider: false },
         { name: 'Posterize', value: 'posterize', hasSlider: false },
         { name: 'Emboss', value: 'emboss', hasSlider: false },
-        { name: 'Glitch', value: 'glitch', hasSlider: false }
+        { name: 'Glitch', value: 'glitch', hasSlider: true, min: 0, max: 20, label: 'Amount' },
+        { name: 'Invert', value: 'invert', hasSlider: false }
     ];
     
     const effectsContainer = document.getElementById('blend-modes');
@@ -730,11 +732,10 @@ function initializeSVGEffects() {
         let sliderContainer = null;
         if (effect.hasSlider) {
             sliderContainer = document.createElement('div');
-            sliderContainer.style.display = 'none';
             sliderContainer.style.marginLeft = '20px';
             sliderContainer.style.marginTop = '5px';
             sliderContainer.style.fontSize = '12px';
-            sliderContainer.style.display = 'flex';
+            sliderContainer.style.display = 'none';
             sliderContainer.style.alignItems = 'center';
             sliderContainer.style.gap = '8px';
             
@@ -745,29 +746,40 @@ function initializeSVGEffects() {
             
             const slider = document.createElement('input');
             slider.type = 'range';
-            slider.id = 'blur-slider';
+            slider.id = `${effect.value}-slider`;
             slider.min = effect.min;
             slider.max = effect.max;
-            slider.value = effectIntensity.blur;
+            slider.value = effectIntensity[effect.value] || effect.min;
             slider.style.flex = '1';
             slider.style.cursor = 'pointer';
             
             const valueDisplay = document.createElement('span');
-            valueDisplay.textContent = slider.value + 'px';
+            valueDisplay.textContent = slider.value + (effect.value === 'blur' ? 'px' : '');
             valueDisplay.style.minWidth = '35px';
             valueDisplay.style.textAlign = 'right';
             
             slider.addEventListener('input', function() {
-                effectIntensity.blur = parseInt(this.value);
-                valueDisplay.textContent = this.value + 'px';
+                if (effect.value === 'blur') {
+                    effectIntensity.blur = parseInt(this.value);
+                } else if (effect.value === 'glitch') {
+                    effectIntensity.glitch = parseInt(this.value);
+                    // Update glitch filter scale
+                    const glitchDisplacementMap = document.querySelector('#svg-glitch feDisplacementMap');
+                    if (glitchDisplacementMap) {
+                        glitchDisplacementMap.setAttribute('scale', this.value);
+                    }
+                }
+                valueDisplay.textContent = this.value + (effect.value === 'blur' ? 'px' : '');
                 // Update SVG filter blur value
-                const blurFilter = document.getElementById('blur-filter');
-                if (blurFilter) {
-                    blurFilter.setAttribute('stdDeviation', this.value);
+                if (effect.value === 'blur') {
+                    const blurFilter = document.getElementById('blur-filter');
+                    if (blurFilter) {
+                        blurFilter.setAttribute('stdDeviation', this.value);
+                    }
                 }
                 applySVGEffects();
                 resetHeartButton();
-                // Update URL with new blur value
+                // Update URL with new effects
                 const settings = getCollageSettings();
                 encodeSettingsToURL(settings);
             });
@@ -784,11 +796,16 @@ function initializeSVGEffects() {
                 if (!selectedEffects.includes(this.value)) {
                     selectedEffects.push(this.value);
                 }
+                if (sliderContainer) {
+                    sliderContainer.style.display = 'flex';
+                    sliderContainer.style.alignItems = 'center';
+                    sliderContainer.style.gap = '8px';
+                }
             } else {
                 selectedEffects = selectedEffects.filter(e => e !== this.value);
-            }
-            if (sliderContainer) {
-                sliderContainer.style.display = this.checked ? 'flex' : 'none';
+                if (sliderContainer) {
+                    sliderContainer.style.display = 'none';
+                }
             }
             applySVGEffects();
             resetHeartButton();
@@ -865,6 +882,9 @@ function saveAsJPG() {
                     break;
                 case 'glitch':
                     filterString += 'hue-rotate(45deg) saturate(1.5) ';
+                    break;
+                case 'invert':
+                    filterString += 'invert(1) ';
                     break;
             }
         });
@@ -1577,11 +1597,15 @@ function updateUIFromSettings() {
     // Update effect checkboxes and slider
     document.querySelectorAll('.blend-mode-radio').forEach(checkbox => {
         checkbox.checked = selectedEffects.includes(checkbox.value);
-        // Also show/hide slider if it's a blur effect
-        if (checkbox.value === 'blur') {
+        // Also show/hide slider if it's a blur or glitch effect
+        if (checkbox.value === 'blur' || checkbox.value === 'glitch') {
             const sliderContainer = checkbox.closest('div').querySelector('div[style*="display"]');
             if (sliderContainer) {
                 sliderContainer.style.display = checkbox.checked ? 'flex' : 'none';
+                if (checkbox.checked) {
+                    sliderContainer.style.alignItems = 'center';
+                    sliderContainer.style.gap = '8px';
+                }
             }
         }
     });
@@ -1594,6 +1618,22 @@ function updateUIFromSettings() {
         const valueDisplay = blurSlider.parentElement.querySelector('span');
         if (valueDisplay) {
             valueDisplay.textContent = effectIntensity.blur + 'px';
+        }
+    }
+    
+    // Update glitch slider value and display
+    const glitchSlider = document.getElementById('glitch-slider');
+    if (glitchSlider) {
+        glitchSlider.value = effectIntensity.glitch;
+        // Update the value display next to the slider
+        const valueDisplay = glitchSlider.parentElement.querySelector('span');
+        if (valueDisplay) {
+            valueDisplay.textContent = effectIntensity.glitch;
+        }
+        // Update glitch filter scale
+        const glitchDisplacementMap = document.querySelector('#svg-glitch feDisplacementMap');
+        if (glitchDisplacementMap) {
+            glitchDisplacementMap.setAttribute('scale', effectIntensity.glitch);
         }
     }
     
