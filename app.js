@@ -99,6 +99,12 @@ let assetsGenerated = false;
 let currentCollageLayout = null;
 let currentCollageImages = [];
 
+// Track the user-selected layout (null means random)
+let selectedLayout = null;
+
+// Track images for the currently selected layout
+let layoutSelectedImages = null;
+
 // Flag to prevent re-rendering when loading from URL
 let loadingFromURL = false;
 
@@ -262,6 +268,7 @@ const layoutPatterns = [
 
 function setToolbarButtonsEnabled(enabled) {
     filterBtn.disabled = !enabled;
+    layoutBtn.disabled = !enabled;
     effectsBtn.disabled = !enabled;
     imageBtn.disabled = !enabled;
     overlayBtn.disabled = !enabled;
@@ -304,24 +311,48 @@ function renderCollage(forceImages = null, forceLayout = null) {
             return;
         }
 
-        // Select random number of images between 3 and 6
-        const imageCount = Math.floor(Math.random() * 4) + 3; // 3-6
-        selectedImagesData = filteredImages
-            .sort(() => 0.5 - Math.random())
-            .slice(0, Math.min(imageCount, filteredImages.length));
-        
-        // Add custom image URL if provided and mix it randomly into the layout
-        if (customImageUrl) {
-            selectedImagesData.push({ path: customImageUrl, tags: ['custom'] });
-            // Shuffle to randomize position
-            for (let i = selectedImagesData.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [selectedImagesData[i], selectedImagesData[j]] = [selectedImagesData[j], selectedImagesData[i]];
+        // Determine layout: use selectedLayout if available, otherwise random
+        if (selectedLayout) {
+            layout = selectedLayout;
+            // If we have previously selected images for this layout, reuse them
+            if (layoutSelectedImages && layoutSelectedImages.length > 0) {
+                selectedImagesData = layoutSelectedImages;
+            } else {
+                // First time selecting this layout - pick images
+                const requiredImageCount = layout.positions.length;
+                const imageCount = Math.max(requiredImageCount, Math.floor(Math.random() * 4) + 3);
+                selectedImagesData = filteredImages
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, Math.min(imageCount, filteredImages.length));
+                
+                if (customImageUrl) {
+                    selectedImagesData.push({ path: customImageUrl, tags: ['custom'] });
+                }
+                
+                // Store these images for this layout
+                layoutSelectedImages = selectedImagesData;
+            }
+        } else {
+            // No layout selected - random behavior
+            layout = getRandomLayout();
+            layoutSelectedImages = null; // Clear stored images
+            
+            const requiredImageCount = layout.positions.length;
+            const imageCount = Math.max(requiredImageCount, Math.floor(Math.random() * 4) + 3);
+            selectedImagesData = filteredImages
+                .sort(() => 0.5 - Math.random())
+                .slice(0, Math.min(imageCount, filteredImages.length));
+            
+            if (customImageUrl) {
+                selectedImagesData.push({ path: customImageUrl, tags: ['custom'] });
+                // Shuffle to randomize position only when no layout is selected
+                for (let i = selectedImagesData.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [selectedImagesData[i], selectedImagesData[j]] = [selectedImagesData[j], selectedImagesData[i]];
+                }
             }
         }
         
-        // Select a random layout pattern
-        layout = getRandomLayout();
         positions = layout.positions.slice(0);
         console.log('RENDER: Random render - selected images:', selectedImagesData.map(i => i.path), 'layout:', layout.name);
     }
@@ -634,6 +665,8 @@ function applySVGEffects() {
 }
 
 function shuffleLayout() {
+    // If a layout is selected, shuffle only the images in that layout
+    // If no layout is selected, shuffle everything (current behavior)
     renderCollage();
     resetHeartButton();
 }
@@ -648,6 +681,54 @@ function resetHeartButton() {
 
 function printCollage() {
     window.print();
+}
+
+function initializeLayoutOptions() {
+    const layoutContainer = document.getElementById('layout-list');
+    layoutContainer.innerHTML = ''; // Clear existing layouts
+    
+    layoutPatterns.forEach((layout, index) => {
+        const layoutButton = document.createElement('button');
+        layoutButton.className = 'layout-option btn btn-sm btn-outline-secondary mb-2';
+        layoutButton.style.width = '100%';
+        layoutButton.textContent = layout.name.replace(/-/g, ' ').charAt(0).toUpperCase() + layout.name.replace(/-/g, ' ').slice(1);
+        layoutButton.dataset.layoutIndex = index;
+        
+        // Mark as active if this is the selected layout
+        if (selectedLayout && selectedLayout.name === layout.name) {
+            layoutButton.classList.remove('btn-outline-secondary');
+            layoutButton.classList.add('btn-primary');
+        }
+        
+        layoutButton.addEventListener('click', function(e) {
+            e.stopPropagation();
+            selectedLayout = layout;
+            // Preserve current images when selecting a layout
+            if (currentCollageImages && currentCollageImages.length > 0) {
+                layoutSelectedImages = currentCollageImages;
+            }
+            
+            // Update all layout buttons
+            document.querySelectorAll('.layout-option').forEach(btn => {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline-secondary');
+            });
+            layoutButton.classList.remove('btn-outline-secondary');
+            layoutButton.classList.add('btn-primary');
+            
+            // Re-render with selected layout
+            renderCollage();
+            resetHeartButton();
+            
+            // Update URL
+            setTimeout(() => {
+                const settings = getCollageSettings();
+                encodeSettingsToURL(settings);
+            }, 100);
+        });
+        
+        layoutContainer.appendChild(layoutButton);
+    });
 }
 
 function initializeTagFilters() {
@@ -1021,6 +1102,11 @@ tryAgainBtn.addEventListener('click', function() {
         setToolbarButtonsEnabled(true);
     }
     
+    // Clear stored images to force regeneration
+    // If a layout is selected, it will regenerate images for that layout
+    // If no layout is selected, it will regenerate both layout and images
+    layoutSelectedImages = null;
+    
     shuffleLayout();
     
     // Update URL with new collage layout
@@ -1032,6 +1118,10 @@ tryAgainBtn.addEventListener('click', function() {
 
 const filterBtn = document.getElementById('filterBtn');
 const dropdown = document.getElementById('tag-filters');
+const layoutBtn = document.getElementById('layoutBtn');
+const layoutPanel = document.getElementById('layout-panel');
+const layoutList = document.getElementById('layout-list');
+const clearLayoutBtn = document.getElementById('clearLayoutBtn');
 const effectsBtn = document.getElementById('effectsBtn');
 const effectsDropdown = document.getElementById('blend-modes');
 const imageBtn = document.getElementById('imageBtn');
@@ -1074,6 +1164,7 @@ const paintToggle = document.getElementById('paintToggle');
 
 function closeAllFlyouts() {
     dropdown.classList.remove('show');
+    layoutPanel.classList.remove('show');
     effectsDropdown.classList.remove('show');
     imageModal.classList.remove('show');
     textModal.classList.remove('show');
@@ -1088,6 +1179,16 @@ filterBtn.addEventListener('click', function(e) {
     closeAllFlyouts();
     if (!isOpen) {
         dropdown.classList.add('show');
+    }
+});
+
+layoutBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const isOpen = layoutPanel.classList.contains('show');
+    closeAllFlyouts();
+    if (!isOpen) {
+        layoutPanel.classList.add('show');
+        populateLayoutList();
     }
 });
 
@@ -1159,6 +1260,24 @@ clearImageBtn.addEventListener('click', function() {
     imageModal.classList.remove('show');
     renderCollage();
     resetHeartButton();
+});
+
+clearLayoutBtn.addEventListener('click', function() {
+    selectedLayout = null;
+    layoutSelectedImages = null;
+    // Reset all layout buttons to outline style
+    document.querySelectorAll('.layout-option').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-secondary');
+    });
+    renderCollage();
+    resetHeartButton();
+    
+    // Update URL
+    setTimeout(() => {
+        const settings = getCollageSettings();
+        encodeSettingsToURL(settings);
+    }, 100);
 });
 
 // Real-time text input
@@ -1332,6 +1451,9 @@ document.addEventListener('click', function(e) {
     if (!filterBtn.contains(e.target) && !dropdown.contains(e.target)) {
         dropdown.classList.remove('show');
     }
+    if (!layoutBtn.contains(e.target) && !layoutPanel.contains(e.target)) {
+        layoutPanel.classList.remove('show');
+    }
     if (!effectsBtn.contains(e.target) && !effectsDropdown.contains(e.target)) {
         effectsDropdown.classList.remove('show');
     }
@@ -1355,6 +1477,7 @@ document.addEventListener('click', function(e) {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeTagFilters();
+    initializeLayoutOptions();
     initializeSVGEffects();
     initializeOverlays();
     
@@ -1515,7 +1638,9 @@ function getCollageSettings() {
         paintEnabled: paintEnabled,
         // Store the actual collage composition
         collageImages: currentCollageImages,
-        collageLayout: currentCollageLayout
+        collageLayout: currentCollageLayout,
+        // Store the selected layout if one was chosen
+        selectedLayout: selectedLayout
     };
 }
 
@@ -1545,7 +1670,22 @@ function restoreCollageSettings(settings) {
     // Restore the collage composition if available
     currentCollageImages = settings.collageImages || [];
     currentCollageLayout = settings.collageLayout || null;
+    selectedLayout = settings.selectedLayout || null;
     console.log('RESTORE: Set currentCollageImages to:', currentCollageImages.map(i => i.path));
+    
+    // Update layout panel to show selected layout
+    if (selectedLayout) {
+        layoutSelectedImages = currentCollageImages;
+        document.querySelectorAll('.layout-option').forEach(btn => {
+            if (btn.dataset.layoutIndex === layoutPatterns.findIndex(l => l.name === selectedLayout.name).toString()) {
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-primary');
+            } else {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline-secondary');
+            }
+        });
+    }
     
     // Update UI elements
     updateUIFromSettings();
@@ -1719,8 +1859,10 @@ function encodeSettingsToURL(settings) {
         console.log('Settings collageImages:', settings?.collageImages?.map(i => i.path));
         const params = new URLSearchParams();
         
-        // Layout
-        if (settings.collageLayout) {
+        // Layout - use selectedLayout if explicitly chosen
+        if (settings.selectedLayout) {
+            params.set('selectedLayout', settings.selectedLayout.name);
+        } else if (settings.collageLayout) {
             params.set('layout', settings.collageLayout.name);
         }
         
@@ -1807,14 +1949,21 @@ function decodeSettingsFromURL() {
     const settings = {};
     
     // Check if there are any collage-related parameters
-    if (!params.has('layout') && !params.has('tags') && !params.has('effects') && 
+    if (!params.has('layout') && !params.has('selectedLayout') && !params.has('tags') && !params.has('effects') && 
         !params.has('text') && !params.has('overlay') && !params.has('paint') && !params.has('images')) {
         return null;
     }
     
     try {
-        // Layout
-        if (params.has('layout')) {
+        // Layout - check for explicitly selected layout first
+        if (params.has('selectedLayout')) {
+            const layoutName = params.get('selectedLayout');
+            const layout = layoutPatterns.find(l => l.name === layoutName);
+            if (layout) {
+                settings.selectedLayout = layout;
+                settings.collageLayout = layout;
+            }
+        } else if (params.has('layout')) {
             const layoutName = params.get('layout');
             const layout = layoutPatterns.find(l => l.name === layoutName);
             if (layout) {
