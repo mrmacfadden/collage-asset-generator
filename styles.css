@@ -9,6 +9,16 @@
     box-sizing: border-box;
 }
 
+a {
+    color: #a855f7;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #c084fc;
+    text-decoration: underline;
+}
+
 html,
 body {
     height: 100%;
@@ -949,6 +959,26 @@ header h1:hover {
 }
 
 .share-btn:hover {
+    color: #a855f7;
+    transform: scale(1.1);
+}
+
+/* Info Button */
+.info-btn {
+    position: fixed;
+    right: 8rem;
+    bottom: 2rem;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: #6c757d;
+    transition: all 0.2s ease;
+    padding: 0.5rem;
+    z-index: 1000;
+}
+
+.info-btn:hover {
     color: #a855f7;
     transform: scale(1.1);
 }
