@@ -88,9 +88,13 @@ let selectedOverlay = '';
 let overlayOpacity = 100;
 
 // Track paint overlay settings
-let paintColor = '#FFFF00';
+let paintColor = '#F2B041';
 let paintOpacity = 50;
 let paintEnabled = false;
+
+// Track background color settings
+let backgroundColor = '#E8D4B9';
+let backgroundColorEnabled = false;
 
 // Track if collage has been generated
 let assetsGenerated = false;
@@ -463,6 +467,9 @@ function renderCollage(forceImages = null, forceLayout = null) {
     
     // Apply overlay if selected
     applyOverlay();
+    
+    // Apply background color if enabled
+    applyBackgroundColor();
 }
 
 function replaceImageAtIndex(index) {
@@ -637,6 +644,18 @@ function applyPaintOverlay() {
     } else {
         if (paintElement) {
             paintElement.remove();
+        }
+    }
+}
+
+function applyBackgroundColor() {
+    const container = document.querySelector('.collage-container.active');
+    
+    if (container) {
+        if (backgroundColorEnabled) {
+            container.style.backgroundColor = backgroundColor;
+        } else {
+            container.style.backgroundColor = 'transparent';
         }
     }
 }
@@ -1231,6 +1250,10 @@ const paintOpacitySlider = document.getElementById('paintOpacity');
 const paintOpacityValue = document.getElementById('paintOpacityValue');
 const paintToggle = document.getElementById('paintToggle');
 
+const backgroundColorInput = document.getElementById('backgroundColor');
+const backgroundColorValue = document.getElementById('backgroundColorValue');
+const backgroundColorToggle = document.getElementById('backgroundColorToggle');
+
 function closeAllFlyouts() {
     dropdown.classList.remove('show');
     layoutPanel.classList.remove('show');
@@ -1494,6 +1517,23 @@ paintToggle.addEventListener('change', function() {
     resetHeartButton();
 });
 
+backgroundColorInput.addEventListener('change', function() {
+    backgroundColor = this.value;
+    backgroundColorValue.textContent = this.value.toUpperCase();
+    applyBackgroundColor();
+    resetHeartButton();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
+});
+
+backgroundColorToggle.addEventListener('change', function() {
+    backgroundColorEnabled = this.checked;
+    applyBackgroundColor();
+    const settings = getCollageSettings();
+    encodeSettingsToURL(settings);
+    resetHeartButton();
+});
+
 // Close dropdown when clicking outside
 document.addEventListener('click', function(e) {
     const savesBtn = document.getElementById('savesBtn');
@@ -1688,6 +1728,8 @@ function getCollageSettings() {
         paintColor: paintColor,
         paintOpacity: paintOpacity,
         paintEnabled: paintEnabled,
+        backgroundColor: backgroundColor,
+        backgroundColorEnabled: backgroundColorEnabled,
         // Store the actual collage composition
         collageImages: currentCollageImages,
         collageLayout: currentCollageLayout,
@@ -1714,10 +1756,13 @@ function restoreCollageSettings(settings) {
     textZIndex = settings.textZIndex || 100;
     selectedOverlay = settings.selectedOverlay || '';
     overlayOpacity = settings.overlayOpacity || 100;
-    paintColor = settings.paintColor || '#FFFF00';
+    paintColor = settings.paintColor || '#F2B041';
     paintOpacity = settings.paintOpacity || 50;
     paintEnabled = settings.paintEnabled || false;
+    backgroundColor = settings.backgroundColor || '#E8D4B9';
+    backgroundColorEnabled = settings.backgroundColorEnabled || false;
     console.log('Restored paint settings:', { paintEnabled, paintColor, paintOpacity });
+    console.log('Restored background color settings:', { backgroundColorEnabled, backgroundColor });
     
     // Restore the collage composition if available
     currentCollageImages = settings.collageImages || [];
@@ -1901,6 +1946,20 @@ function updateUIFromSettings() {
     const paintToggle = document.getElementById('paintToggle');
     if (paintToggle) {
         paintToggle.checked = paintEnabled;
+    }
+    
+    // Update background color settings
+    const backgroundColorEl = document.getElementById('backgroundColor');
+    if (backgroundColorEl) {
+        backgroundColorEl.value = backgroundColor;
+    }
+    const backgroundColorValue = document.getElementById('backgroundColorValue');
+    if (backgroundColorValue) {
+        backgroundColorValue.textContent = backgroundColor;
+    }
+    const backgroundColorToggle = document.getElementById('backgroundColorToggle');
+    if (backgroundColorToggle) {
+        backgroundColorToggle.checked = backgroundColorEnabled;
     }
 }
 
@@ -2090,7 +2149,7 @@ function decodeSettingsFromURL() {
         // Paint overlay
         settings.paintEnabled = params.get('paint') === '1';
         // Restore color with # prefix (URL stores without #)
-        const paintColorValue = params.get('paintColor') || 'FFFF00';
+        const paintColorValue = params.get('paintColor') || 'F2B041';
         settings.paintColor = paintColorValue.startsWith('#') ? paintColorValue : '#' + paintColorValue;
         settings.paintOpacity = params.has('paintOpacity') ? parseInt(params.get('paintOpacity')) : 50;
         
