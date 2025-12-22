@@ -118,6 +118,10 @@ let favoriteLayouts = [];
 // Flag to prevent re-rendering when loading from URL
 let loadingFromURL = false;
 
+// Track zoom and position data for images by path
+// Structure: { 'img/path.jpg': { zoom: 1.5, offsetX: 50, offsetY: 25 }, ... }
+let imageZoomAndPositionData = {};
+
 // Layout patterns with grid positions
 const layoutPatterns = [
     // Pattern 1: One tall on left + three stacked on right
@@ -430,9 +434,17 @@ function renderCollage(forceImages = null, forceLayout = null) {
         item.className = `collage-item col-span-${pos.colspan} row-span-${pos.rowspan}`;
         item.innerHTML = `
             <img src="${imageData.path}" alt="Collage image ${index + 1}" loading="lazy">
-            <button class="replace-icon" title="Replace this image" data-index="${index}">
-                <i class="bi bi-arrow-repeat"></i>
-            </button>
+            <div class="image-controls">
+                <button class="replace-icon" title="Replace this image" data-index="${index}">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+                <button class="zoom-icon" title="Zoom & Focus" data-index="${index}">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="reposition-icon" title="Reposition image" data-index="${index}">
+                    <i class="bi bi-arrows-move"></i>
+                </button>
+            </div>
         `;
         // Apply SVG filters to the image
         const img = item.querySelector('img');
@@ -455,11 +467,32 @@ function renderCollage(forceImages = null, forceLayout = null) {
             img.style.filter = filterParts.join(' ');
         }
         
+        // Apply zoom and position data if available
+        const zoomData = imageZoomAndPositionData[imageData.path];
+        if (zoomData) {
+            const transform = `scale(${zoomData.zoom}) translate(${zoomData.offsetX}px, ${zoomData.offsetY}px)`;
+            img.style.transform = transform;
+        }
+        
         // Add click handler to replace button
         const replaceBtn = item.querySelector('.replace-icon');
         replaceBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             replaceImageAtIndex(index);
+        });
+        
+        // Add click handler to zoom button
+        const zoomBtn = item.querySelector('.zoom-icon');
+        zoomBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openZoomSlider(index, imageData, item);
+        });
+        
+        // Add click handler to reposition button
+        const repositionBtn = item.querySelector('.reposition-icon');
+        repositionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openRepositionModal(index, imageData, item);
         });
         
         container.appendChild(item);
@@ -473,6 +506,12 @@ function renderCollage(forceImages = null, forceLayout = null) {
 }
 
 function replaceImageAtIndex(index) {
+    // Close any open sliders
+    const zoomSliders = document.querySelectorAll('.zoom-slider-overlay');
+    const repositionSliders = document.querySelectorAll('.reposition-slider-overlay');
+    zoomSliders.forEach(slider => slider.remove());
+    repositionSliders.forEach(slider => slider.remove());
+    
     const filteredImages = filterImagesByTags(selectedTags);
     
     if (filteredImages.length === 0) {
@@ -494,6 +533,12 @@ function replaceImageAtIndex(index) {
     // Select a random image
     const randomImage = imagesToChooseFrom[Math.floor(Math.random() * imagesToChooseFrom.length)];
     
+    // Clear zoom and position data for the old image
+    const oldImage = currentCollageImages[index];
+    if (oldImage && imageZoomAndPositionData[oldImage.path]) {
+        delete imageZoomAndPositionData[oldImage.path];
+    }
+    
     // Replace the image at the specified index
     currentCollageImages[index] = randomImage;
     
@@ -506,6 +551,9 @@ function replaceImageAtIndex(index) {
         const img = targetItem.querySelector('img');
         if (img) {
             img.src = randomImage.path;
+            
+            // Reset transform to default (no zoom/position)
+            img.style.transform = '';
             
             // Re-apply filters to the updated image
             let filterParts = [];
@@ -526,6 +574,39 @@ function replaceImageAtIndex(index) {
                 img.style.filter = filterParts.join(' ');
             } else {
                 img.style.filter = '';
+            }
+            
+            // Update the image controls with the new image data
+            const oldZoomBtn = targetItem.querySelector('.zoom-icon');
+            const oldRepositionBtn = targetItem.querySelector('.reposition-icon');
+            const oldReplaceBtn = targetItem.querySelector('.replace-icon');
+            
+            // Remove old event listeners by cloning and replacing
+            if (oldZoomBtn) {
+                const newZoomBtn = oldZoomBtn.cloneNode(true);
+                oldZoomBtn.replaceWith(newZoomBtn);
+                newZoomBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openZoomSlider(index, randomImage, targetItem);
+                });
+            }
+            
+            if (oldRepositionBtn) {
+                const newRepositionBtn = oldRepositionBtn.cloneNode(true);
+                oldRepositionBtn.replaceWith(newRepositionBtn);
+                newRepositionBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openRepositionModal(index, randomImage, targetItem);
+                });
+            }
+            
+            if (oldReplaceBtn) {
+                const newReplaceBtn = oldReplaceBtn.cloneNode(true);
+                oldReplaceBtn.replaceWith(newReplaceBtn);
+                newReplaceBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    replaceImageAtIndex(index);
+                });
             }
         }
     }
@@ -1196,7 +1277,11 @@ tryAgainBtn.addEventListener('click', function() {
     // If no layout is selected, it will regenerate both layout and images
     layoutSelectedImages = null;
     
-    shuffleLayout();
+    // Clear zoom and position data for new images
+    imageZoomAndPositionData = {};
+    
+    // Force collage re-render which will get new images and apply no zoom
+    renderCollage();
     
     // Update URL with new collage layout
     setTimeout(() => {
@@ -1734,7 +1819,9 @@ function getCollageSettings() {
         collageImages: currentCollageImages,
         collageLayout: currentCollageLayout,
         // Store the selected layout if one was chosen
-        selectedLayout: selectedLayout
+        selectedLayout: selectedLayout,
+        // Store image zoom and position data
+        imageZoomAndPositionData: imageZoomAndPositionData
     };
 }
 
@@ -1768,6 +1855,7 @@ function restoreCollageSettings(settings) {
     currentCollageImages = settings.collageImages || [];
     currentCollageLayout = settings.collageLayout || null;
     selectedLayout = settings.selectedLayout || null;
+    imageZoomAndPositionData = settings.imageZoomAndPositionData || {};
     console.log('RESTORE: Set currentCollageImages to:', currentCollageImages.map(i => i.path));
     
     // Update layout panel to show selected layout
@@ -2044,6 +2132,29 @@ function encodeSettingsToURL(settings) {
             params.set('paintColor', settings.paintColor.replace('#', ''));
         }
         
+        // Zoom and position data for images
+        if (settings.imageZoomAndPositionData && Object.keys(settings.imageZoomAndPositionData).length > 0 && settings.collageImages) {
+            // Convert path-based zoom data to ID-based for cleaner URLs
+            const zoomDataByIndex = {};
+            settings.collageImages.forEach((img, index) => {
+                if (settings.imageZoomAndPositionData[img.path]) {
+                    const data = settings.imageZoomAndPositionData[img.path];
+                    zoomDataByIndex[index] = {
+                        zoom: data.zoom,
+                        offsetX: data.offsetX,
+                        offsetY: data.offsetY
+                    };
+                }
+            });
+            
+            if (Object.keys(zoomDataByIndex).length > 0) {
+                const zoomData = Object.entries(zoomDataByIndex).map(([index, data]) => {
+                    return `${index}:${data.zoom.toFixed(2)},${data.offsetX.toFixed(0)},${data.offsetY.toFixed(0)}`;
+                }).join(';');
+                params.set('zoom', zoomData);
+            }
+        }
+        
         // Update URL with human-readable parameters
         const queryString = params.toString();
         console.log('=== ENCODE END ===');
@@ -2152,6 +2263,33 @@ function decodeSettingsFromURL() {
         const paintColorValue = params.get('paintColor') || 'F2B041';
         settings.paintColor = paintColorValue.startsWith('#') ? paintColorValue : '#' + paintColorValue;
         settings.paintOpacity = params.has('paintOpacity') ? parseInt(params.get('paintOpacity')) : 50;
+        
+        // Zoom and position data for images
+        settings.imageZoomAndPositionData = {};
+        if (params.has('zoom')) {
+            try {
+                const zoomParam = params.get('zoom');
+                const zoomEntries = zoomParam.split(';');
+                zoomEntries.forEach(entry => {
+                    const [indexStr, dataStr] = entry.split(':');
+                    const index = parseInt(indexStr);
+                    const [zoom, offsetX, offsetY] = dataStr.split(',').map(v => parseFloat(v));
+                    
+                    // Map index to image path if available
+                    if (settings.collageImages && settings.collageImages[index]) {
+                        const imagePath = settings.collageImages[index].path;
+                        settings.imageZoomAndPositionData[imagePath] = {
+                            zoom: zoom,
+                            offsetX: offsetX,
+                            offsetY: offsetY
+                        };
+                    }
+                });
+            } catch (e) {
+                console.warn('Could not decode zoom data from URL:', e);
+                settings.imageZoomAndPositionData = {};
+            }
+        }
         
         // Only set collageLayout if we have images to render
         if (!settings.collageImages || settings.collageImages.length === 0) {
@@ -2505,3 +2643,189 @@ window.addEventListener('load', () => {
     console.log('===== PAGE LOAD COMPLETE =====');
     setupURLUpdateListeners();
 });
+
+// Zoom and Reposition Modal Functions
+// ============================================================
+
+function updateImageInDOM(imagePath) {
+    // Find and update the image element with the given path
+    const collageContainer = document.getElementById('collage-container');
+    const imageElements = collageContainer.querySelectorAll('img[src="' + imagePath + '"]');
+    
+    imageElements.forEach(img => {
+        const zoomData = imageZoomAndPositionData[imagePath];
+        if (zoomData) {
+            const transform = `scale(${zoomData.zoom}) translate(${zoomData.offsetX}px, ${zoomData.offsetY}px)`;
+            img.style.transform = transform;
+            img.style.transformOrigin = 'center center';
+        } else {
+            // Reset if no data
+            img.style.transform = '';
+            img.style.transformOrigin = '';
+        }
+    });
+}
+
+function openZoomSlider(index, imageData, itemElement) {
+    // Get current zoom data or set defaults
+    const zoomData = imageZoomAndPositionData[imageData.path] || { zoom: 1, offsetX: 0, offsetY: 0 };
+    
+    // Create slider overlay HTML
+    const sliderId = 'zoom-slider-overlay-' + Date.now();
+    const sliderHtml = `
+        <div id="${sliderId}" class="zoom-slider-overlay">
+            <div class="zoom-slider-toolbar">
+                <input type="range" id="zoom-range-${index}" class="zoom-range-input" min="50" max="500" value="${zoomData.zoom * 100}">
+                <span id="zoom-percent-${index}" class="zoom-percent">${(zoomData.zoom * 100).toFixed(0)}%</span>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', sliderHtml);
+    const sliderOverlay = document.getElementById(sliderId);
+    const rangeInput = sliderOverlay.querySelector('.zoom-range-input');
+    const percentDisplay = sliderOverlay.querySelector('.zoom-percent');
+    
+    let currentZoom = zoomData.zoom;
+    
+    // Handle zoom slider
+    rangeInput.addEventListener('input', (e) => {
+        currentZoom = e.target.value / 100;
+        percentDisplay.textContent = e.target.value + '%';
+        
+        // Update the image zoom in real-time
+        const img = itemElement.querySelector('img');
+        const offsetData = imageZoomAndPositionData[imageData.path] || { offsetX: 0, offsetY: 0 };
+        const transform = `scale(${currentZoom}) translate(${offsetData.offsetX}px, ${offsetData.offsetY}px)`;
+        img.style.transform = transform;
+    });
+    
+    // Save zoom data when slider loses focus or input ends
+    rangeInput.addEventListener('change', () => {
+        imageZoomAndPositionData[imageData.path] = {
+            zoom: currentZoom,
+            offsetX: (imageZoomAndPositionData[imageData.path] || {}).offsetX || 0,
+            offsetY: (imageZoomAndPositionData[imageData.path] || {}).offsetY || 0
+        };
+        
+        // Update URL with new zoom data
+        const settings = getCollageSettings();
+        encodeSettingsToURL(settings);
+    });
+    
+    // Hide slider when clicking outside
+    function hideSlider(e) {
+        // Don't hide if clicking on the slider itself or the zoom button
+        if (!sliderOverlay.contains(e.target) && !e.target.closest('.zoom-icon')) {
+            // Save zoom data when closing
+            imageZoomAndPositionData[imageData.path] = {
+                zoom: currentZoom,
+                offsetX: (imageZoomAndPositionData[imageData.path] || {}).offsetX || 0,
+                offsetY: (imageZoomAndPositionData[imageData.path] || {}).offsetY || 0
+            };
+            
+            // Update URL with final zoom data
+            const settings = getCollageSettings();
+            encodeSettingsToURL(settings);
+            
+            sliderOverlay.remove();
+            document.removeEventListener('click', hideSlider);
+        }
+    }
+    
+    document.addEventListener('click', hideSlider);
+}
+
+
+function openRepositionModal(index, imageData, itemElement) {
+    // Get current zoom data or set defaults
+    const zoomData = imageZoomAndPositionData[imageData.path] || { zoom: 1, offsetX: 0, offsetY: 0 };
+    
+    // Create slider overlay HTML
+    const sliderId = 'reposition-slider-overlay-' + Date.now();
+    const sliderHtml = `
+        <div id="${sliderId}" class="reposition-slider-overlay">
+            <div class="reposition-slider-toolbar">
+                <div class="reposition-slider-group">
+                    <label for="offset-x-range-${index}" class="reposition-label">X:</label>
+                    <input type="range" id="offset-x-range-${index}" class="reposition-range-input" min="-200" max="200" value="${zoomData.offsetX}">
+                    <span id="offset-x-value-${index}" class="reposition-value">${zoomData.offsetX.toFixed(0)}px</span>
+                </div>
+                <div class="reposition-slider-group">
+                    <label for="offset-y-range-${index}" class="reposition-label">Y:</label>
+                    <input type="range" id="offset-y-range-${index}" class="reposition-range-input" min="-200" max="200" value="${zoomData.offsetY}">
+                    <span id="offset-y-value-${index}" class="reposition-value">${zoomData.offsetY.toFixed(0)}px</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', sliderHtml);
+    const sliderOverlay = document.getElementById(sliderId);
+    const offsetXInput = sliderOverlay.querySelector(`#offset-x-range-${index}`);
+    const offsetYInput = sliderOverlay.querySelector(`#offset-y-range-${index}`);
+    const offsetXDisplay = sliderOverlay.querySelector(`#offset-x-value-${index}`);
+    const offsetYDisplay = sliderOverlay.querySelector(`#offset-y-value-${index}`);
+    
+    let currentOffsetX = zoomData.offsetX;
+    let currentOffsetY = zoomData.offsetY;
+    
+    // Function to update image transform
+    function updateImageTransform() {
+        const img = itemElement.querySelector('img');
+        const transform = `scale(${zoomData.zoom}) translate(${currentOffsetX}px, ${currentOffsetY}px)`;
+        img.style.transform = transform;
+    }
+    
+    // Handle X offset slider
+    offsetXInput.addEventListener('input', (e) => {
+        currentOffsetX = parseFloat(e.target.value);
+        offsetXDisplay.textContent = currentOffsetX.toFixed(0) + 'px';
+        updateImageTransform();
+    });
+    
+    // Handle Y offset slider
+    offsetYInput.addEventListener('input', (e) => {
+        currentOffsetY = parseFloat(e.target.value);
+        offsetYDisplay.textContent = currentOffsetY.toFixed(0) + 'px';
+        updateImageTransform();
+    });
+    
+    // Save position data when slider loses focus or input ends
+    offsetXInput.addEventListener('change', savePositionData);
+    offsetYInput.addEventListener('change', savePositionData);
+    
+    function savePositionData() {
+        imageZoomAndPositionData[imageData.path] = {
+            zoom: zoomData.zoom,
+            offsetX: currentOffsetX,
+            offsetY: currentOffsetY
+        };
+        
+        // Update URL with new position data
+        const settings = getCollageSettings();
+        encodeSettingsToURL(settings);
+    }
+    
+    // Hide slider when clicking outside
+    function hideSlider(e) {
+        // Don't hide if clicking on the slider itself or the reposition button
+        if (!sliderOverlay.contains(e.target) && !e.target.closest('.reposition-icon')) {
+            // Save position data when closing
+            imageZoomAndPositionData[imageData.path] = {
+                zoom: zoomData.zoom,
+                offsetX: currentOffsetX,
+                offsetY: currentOffsetY
+            };
+            
+            // Update URL with final position data
+            const settings = getCollageSettings();
+            encodeSettingsToURL(settings);
+            
+            sliderOverlay.remove();
+            document.removeEventListener('click', hideSlider);
+        }
+    }
+    
+    document.addEventListener('click', hideSlider);
+}
