@@ -902,38 +902,53 @@ function initializeLayoutOptions() {
 }
 
 function initializeTagFilters() {
-    const tags = getAllTags();
+    const tagsByCategory = getTagsByCategory();
     const filterContainer = document.getElementById('tag-filters');
     
-    tags.forEach(tag => {
-        const label = document.createElement('label');
-        label.className = 'tag-filter-label';
+    Object.keys(tagsByCategory).forEach(category => {
+        // Create category header
+        const categoryHeader = document.createElement('div');
+        categoryHeader.className = 'tag-category-header';
+        categoryHeader.textContent = category;
+        filterContainer.appendChild(categoryHeader);
         
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'tag-filter-checkbox';
-        checkbox.value = tag;
-        checkbox.dataset.tag = tag;
+        // Create category group
+        const categoryGroup = document.createElement('div');
+        categoryGroup.className = 'tag-category-group';
         
-        checkbox.addEventListener('change', function() {
-            if (this.checked) {
-                if (!selectedTags.includes(tag)) {
-                    selectedTags.push(tag);
+        // Add tags for this category
+        tagsByCategory[category].forEach(tag => {
+            const label = document.createElement('label');
+            label.className = 'tag-filter-label';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'tag-filter-checkbox';
+            checkbox.value = tag;
+            checkbox.dataset.tag = tag;
+            
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    if (!selectedTags.includes(tag)) {
+                        selectedTags.push(tag);
+                    }
+                } else {
+                    selectedTags = selectedTags.filter(t => t !== tag);
                 }
-            } else {
-                selectedTags = selectedTags.filter(t => t !== tag);
-            }
-            // Only render if we're not loading from URL and have images locked in
-            if (!loadingFromURL && (!currentCollageImages.length)) {
-                console.log('Tag filter changed, re-rendering with random images');
-                renderCollage();
-            }
-            resetHeartButton();
+                // Only render if we're not loading from URL and have images locked in
+                if (!loadingFromURL && (!currentCollageImages.length)) {
+                    console.log('Tag filter changed, re-rendering with random images');
+                    renderCollage();
+                }
+                resetHeartButton();
+            });
+            
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(tag));
+            categoryGroup.appendChild(label);
         });
         
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(tag));
-        filterContainer.appendChild(label);
+        filterContainer.appendChild(categoryGroup);
     });
 }
 
@@ -1901,6 +1916,7 @@ function restoreCollageSettings(settings) {
     }
     
     applyPaintOverlay();
+    applyBackgroundColor();
     
     // Update text z-index button states
     updateTextZIndexButtonStates();
@@ -2132,6 +2148,13 @@ function encodeSettingsToURL(settings) {
             params.set('paintColor', settings.paintColor.replace('#', ''));
         }
         
+        // Background color
+        if (settings.backgroundColorEnabled) {
+            params.set('bgColor', '1');
+            // Store color without # to reduce URL encoding
+            params.set('bgColorValue', settings.backgroundColor.replace('#', ''));
+        }
+        
         // Zoom and position data for images
         if (settings.imageZoomAndPositionData && Object.keys(settings.imageZoomAndPositionData).length > 0 && settings.collageImages) {
             // Convert path-based zoom data to ID-based for cleaner URLs
@@ -2172,7 +2195,7 @@ function decodeSettingsFromURL() {
     
     // Check if there are any collage-related parameters
     if (!params.has('layout') && !params.has('selectedLayout') && !params.has('tags') && !params.has('effects') && 
-        !params.has('text') && !params.has('overlay') && !params.has('paint') && !params.has('images')) {
+        !params.has('text') && !params.has('overlay') && !params.has('paint') && !params.has('images') && !params.has('bgColor')) {
         return null;
     }
     
@@ -2263,6 +2286,12 @@ function decodeSettingsFromURL() {
         const paintColorValue = params.get('paintColor') || 'F2B041';
         settings.paintColor = paintColorValue.startsWith('#') ? paintColorValue : '#' + paintColorValue;
         settings.paintOpacity = params.has('paintOpacity') ? parseInt(params.get('paintOpacity')) : 50;
+        
+        // Background color
+        settings.backgroundColorEnabled = params.get('bgColor') === '1';
+        // Restore color with # prefix (URL stores without #)
+        const bgColorValue = params.get('bgColorValue') || 'E8D4B9';
+        settings.backgroundColor = bgColorValue.startsWith('#') ? bgColorValue : '#' + bgColorValue;
         
         // Zoom and position data for images
         settings.imageZoomAndPositionData = {};
@@ -2659,16 +2688,21 @@ function updateImageInDOM(imagePath) {
             img.style.transform = transform;
             img.style.transformOrigin = 'center center';
         } else {
-            // Reset if no data
-            img.style.transform = '';
-            img.style.transformOrigin = '';
+            // Default zoom to fill space like cover (approximately 1.3x for landscape/portrait variations)
+            // User can then pan and adjust from this starting point
+            img.style.transform = 'scale(1.3)';
+            img.style.transformOrigin = 'center center';
         }
     });
 }
 
 function openZoomSlider(index, imageData, itemElement) {
-    // Get current zoom data or set defaults
-    const zoomData = imageZoomAndPositionData[imageData.path] || { zoom: 1, offsetX: 0, offsetY: 0 };
+    // Get current zoom data or set defaults (1.3 is the default fill-space zoom)
+    const zoomData = imageZoomAndPositionData[imageData.path] || { zoom: 1.3, offsetX: 0, offsetY: 0 };
+    
+    // Switch image to contain so user can pan the full image
+    const img = itemElement.querySelector('img');
+    img.style.objectFit = 'contain';
     
     // Create slider overlay HTML
     const sliderId = 'zoom-slider-overlay-' + Date.now();
@@ -2738,8 +2772,12 @@ function openZoomSlider(index, imageData, itemElement) {
 
 
 function openRepositionModal(index, imageData, itemElement) {
-    // Get current zoom data or set defaults
-    const zoomData = imageZoomAndPositionData[imageData.path] || { zoom: 1, offsetX: 0, offsetY: 0 };
+    // Get current zoom data or set defaults (1.3 is the default fill-space zoom)
+    const zoomData = imageZoomAndPositionData[imageData.path] || { zoom: 1.3, offsetX: 0, offsetY: 0 };
+    
+    // Switch image to contain so user can pan the full image
+    const img = itemElement.querySelector('img');
+    img.style.objectFit = 'contain';
     
     // Create slider overlay HTML
     const sliderId = 'reposition-slider-overlay-' + Date.now();
