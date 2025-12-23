@@ -199,6 +199,25 @@ header h1:hover {
 }
 
 /* Checkbox filters */
+.tag-category-header {
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.5rem;
+    border-bottom: 1px solid #495057;
+}
+
+.tag-category-header:first-child {
+    margin-top: 0;
+}
+
+.tag-category-group {
+    padding: 0.25rem 0;
+}
+
 .tag-filter-label {
     display: flex;
     align-items: center;
@@ -868,6 +887,7 @@ header h1:hover {
     height: 100%;
     object-fit: cover;
     object-position: center;
+    transform-origin: center center;
 }
 
 .image-controls {
